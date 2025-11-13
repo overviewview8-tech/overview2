@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import supabase from '../supabase-client'
-import { sendJobCompletionEmail, areAllTasksCompleted } from '../emailService'
+import { sendJobCompletionEmail, sendTaskCompletionEmail, areAllTasksCompleted } from '../emailService'
 import './AdminDashboard.css'
 
 const AdminDashboard = () => {
@@ -344,34 +344,40 @@ const AdminDashboard = () => {
       
       // Verifică dacă toate task-urile job-ului sunt completate
       if (newStatus === 'completed') {
+        // send single-task completion email to client (if present)
+        const job = jobs.find(j => j.id === task.job_id)
+        if (job && job.client_email) {
+          const updatedTask = updatedTasks.find(t => t.id === task.id) || task
+          sendTaskCompletionEmail({
+            to: job.client_email,
+            clientName: job.client_name,
+            jobName: job.name,
+            taskName: updatedTask.name,
+            taskDescription: updatedTask.description,
+            taskValue: updatedTask.value,
+            completedAt: updatedTask.completed_at || new Date().toISOString()
+          }).then(res => {
+            if (res && !res.ok) console.warn('⚠️ Task email failed', res)
+          }).catch(err => console.error('Task email error', err))
+        }
+
+        // Verifică dacă toate task-urile job-ului sunt completate
         const allCompleted = areAllTasksCompleted(updatedTasks, task.job_id)
-        
         if (allCompleted) {
-          // Găsește jobul complet cu toate detaliile
-          const job = jobs.find(j => j.id === task.job_id)
-          
           if (job && job.client_email) {
-            console.log('🎉 Toate task-urile sunt completate! Trimit email...')
-            
-            // Pregătește datele pentru email
+            console.log('🎉 Toate task-urile sunt completate! Trimit job-completion email...')
             const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
             const emailData = {
-              jobName: job.name,
+              to: job.client_email,
               clientName: job.client_name,
-              clientEmail: job.client_email,
+              jobName: job.name,
               tasks: jobTasks,
               totalValue: job.total_value,
               completedAt: new Date().toISOString()
             }
-            
-            // Trimite email (async, nu așteaptă)
-            sendJobCompletionEmail(emailData).then(result => {
-              if (result.success) {
-                console.log('✅ Email trimis cu succes!')
-              } else {
-                console.warn('⚠️ Task completat dar emailul nu a putut fi trimis:', result.error)
-              }
-            })
+            sendJobCompletionEmail(emailData).then(res => {
+              if (res && !res.ok) console.warn('⚠️ Job completion email failed', res)
+            }).catch(err => console.error('Job email error', err))
           }
         }
       }
