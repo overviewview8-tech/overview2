@@ -205,25 +205,25 @@ const EmployeeDashboard = () => {
           
           // Pregătește datele pentru email
           const emailData = {
-            jobName: job.name,
+            to: job.client_email,
             clientName: job.client_name,
-            clientEmail: job.client_email,
+            jobName: job.name,
             tasks: jobTasks,
             totalValue: job.total_value,
             completedAt: new Date().toISOString()
           }
-          
+
           // Trimite email (async, nu așteaptă)
           sendJobCompletionEmail(emailData).then(result => {
-            if (result.success) {
+            if (result && result.ok) {
               console.log('✅ Email trimis cu succes!')
               setMessage('✅ Task completat! 🎉 Jobul este finalizat - Email trimis clientului!')
             } else {
-              console.warn('⚠️ Task completat dar emailul nu a putut fi trimis:', result.error)
+              console.warn('⚠️ Task completat dar emailul nu a putut fi trimis:', result && (result.error || result.data || result))
               setMessage('✅ Task completat! Jobul finalizat. (Email nu a putut fi trimis)')
             }
             setTimeout(() => setMessage(null), 5000)
-          })
+          }).catch(err => console.error('Job email error', err))
         } else {
           setMessage('✅ Task completat! Jobul este finalizat!')
           setTimeout(() => setMessage(null), 3000)
