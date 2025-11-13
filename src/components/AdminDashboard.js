@@ -356,22 +356,22 @@ const AdminDashboard = () => {
             // Pregătește datele pentru email
             const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
             const emailData = {
-              to: job.client_email,
-              clientName: job.client_name,
               jobName: job.name,
+              clientName: job.client_name,
+              clientEmail: job.client_email,
               tasks: jobTasks,
               totalValue: job.total_value,
               completedAt: new Date().toISOString()
             }
-
+            
             // Trimite email (async, nu așteaptă)
             sendJobCompletionEmail(emailData).then(result => {
-              if (result && result.ok) {
+              if (result.success) {
                 console.log('✅ Email trimis cu succes!')
               } else {
-                console.warn('⚠️ Task completat dar emailul nu a putut fi trimis:', result && (result.error || result.data || result))
+                console.warn('⚠️ Task completat dar emailul nu a putut fi trimis:', result.error)
               }
-            }).catch(err => console.error('Job email error', err))
+            })
           }
         }
       }
