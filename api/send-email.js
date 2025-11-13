@@ -23,6 +23,38 @@ module.exports = async (req, res) => {
     const from = process.env.FROM_EMAIL || user
 
     if (!host || !user || !pass) {
+      // If SMTP isn't configured, allow two developer-friendly fallbacks:
+      // 1) If DISABLE_SMTP==='true' return a simulated success (no email sent).
+      // 2) If running locally (NODE_ENV !== 'production') create an Ethereal test account
+      //    so developers can see a preview URL instead of configuring real SMTP.
+      if (process.env.DISABLE_SMTP === 'true') {
+        console.warn('SMTP disabled via DISABLE_SMTP; simulating send', { to, subject })
+        return res.status(200).json({ ok: true, simulated: true })
+      }
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('SMTP config missing — using Ethereal test account for development')
+        const testAccount = await nodemailer.createTestAccount()
+        const testTransporter = nodemailer.createTransport({
+          host: testAccount.smtp.host,
+          port: testAccount.smtp.port,
+          secure: testAccount.smtp.secure,
+          auth: { user: testAccount.user, pass: testAccount.pass }
+        })
+
+        const info = await testTransporter.sendMail({
+          from,
+          to,
+          subject,
+          text: text || undefined,
+          html: html || undefined
+        })
+
+        const preview = nodemailer.getTestMessageUrl(info)
+        console.log('Ethereal preview URL:', preview)
+        return res.status(200).json({ ok: true, preview })
+      }
+
       console.error('SMTP config missing', { host, user, pass: !!pass })
       return res.status(500).json({ error: 'SMTP configuration is not set on the server' })
     }
