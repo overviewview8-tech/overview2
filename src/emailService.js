@@ -37,8 +37,10 @@ export function areAllTasksCompleted(allTasks, jobId) {
   return jt.every(t => t.status === 'completed')
 }
 
-export default {
+const emailService = {
   sendTaskCompletionEmail,
   sendJobCompletionEmail,
-  areAllTasksCompleted
+  areAllTasksCompleted,
 }
+
+export default emailService
