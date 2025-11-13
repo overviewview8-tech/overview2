@@ -1,0 +1,709 @@
+/* ============================================
+   EMPLOYEE DASHBOARD - Modern Design
+   ============================================ */
+
+.dashboard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+  min-height: 100vh;
+}
+
+/* Header Section */
+.dashboard-header {
+  background: var(--primary-light);
+  padding: 32px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dashboard-header h1 {
+  font-size: 32px;
+  color: var(--primary-color);
+  margin: 0;
+  font-weight: 800;
+}
+
+.dashboard-header p {
+  color: var(--gray-color);
+  margin: 8px 0 0 0;
+  font-size: 16px;
+}
+
+.dashboard-header strong {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* Button Styles */
+.btn {
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  transition: var(--transition-normal);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+  box-shadow: 0 6px 20px rgba(44, 62, 80, 0.3);
+}
+
+.btn-secondary {
+  background: var(--gray-color);
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: var(--dark-color);
+}
+
+.btn-success {
+  background: var(--success-color);
+  color: white;
+}
+
+.btn-success:hover {
+  background: var(--success-hover);
+}
+
+.btn-danger {
+  background: var(--danger-color);
+  color: white;
+}
+
+.btn-danger:hover {
+  background: var(--danger-hover);
+}
+
+.btn-small {
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+/* Utility Classes */
+.mb-16 {
+  margin-bottom: 16px;
+}
+
+/* Section Styling */
+section {
+  background: white;
+  padding: 24px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 24px;
+}
+
+section h3 {
+  font-size: 22px;
+  color: var(--dark-color);
+  margin-bottom: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+section h3::before {
+  content: '';
+  width: 4px;
+  height: 24px;
+  background: var(--primary-color);
+  border-radius: 2px;
+}
+
+/* Job Cards */
+.job-card {
+  margin-bottom: 16px;
+  padding: 20px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: #ffffff;
+  transition: var(--transition-normal);
+}
+
+.job-card:hover {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.job-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.job-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--dark-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.job-status.todo {
+  background: var(--warning-light);
+  color: var(--warning-color);
+}
+
+.job-status.completed {
+  background: var(--success-light);
+  color: var(--success-color);
+}
+
+.job-info {
+  font-size: 12px;
+  color: var(--gray-color);
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.job-info strong {
+  color: var(--dark-color);
+  font-weight: 600;
+}
+
+/* Task Cards */
+.task-card {
+  margin-bottom: 12px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: white;
+  transition: var(--transition-normal);
+}
+
+.task-card.completed {
+  background: var(--success-light);
+  border-color: var(--success-color);
+}
+
+.task-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.task-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--dark-color);
+}
+
+.task-info {
+  font-size: 11px;
+  color: var(--gray-color);
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.task-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.task-expanded-content {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+  font-size: 13px;
+  color: var(--gray-color);
+}
+
+.task-expanded-content div {
+  margin-bottom: 6px;
+}
+
+.task-expanded-content strong {
+  color: var(--dark-color);
+  font-weight: 600;
+}
+
+/* Loading & Messages */
+.loading-message {
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+  color: var(--gray-color);
+}
+
+.error-message {
+  background: var(--danger-light);
+  color: var(--danger-color);
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--danger-color);
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.success-message {
+  background: var(--success-light);
+  color: var(--success-color);
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--success-color);
+  margin-bottom: 16px;
+  font-weight: 600;
+  animation: slideInDown 0.3s ease-out;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--gray-color);
+  font-style: italic;
+}
+
+.empty-state::before {
+  content: '📭';
+  display: block;
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+/* Calendar Overlay */
+.calendar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.calendar-modal {
+  background: white;
+  border: 3px solid var(--primary-color);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  box-shadow: var(--shadow-xl);
+  max-width: 700px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: auto;
+  animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.calendar-header h2 {
+  margin: 0;
+  font-size: 26px;
+  color: var(--primary-color);
+  font-weight: 700;
+}
+
+.calendar-nav-btn {
+  font-size: 18px;
+  padding: 10px 20px;
+  background: var(--primary-color);
+  color: white;
+  border-radius: var(--radius-md);
+}
+
+.calendar-nav-btn:hover {
+  background: var(--primary-hover);
+}
+
+/* Action Buttons - Enhanced */
+.action-btn {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-normal);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-btn-expand {
+  background: var(--primary-color);
+  color: white;
+}
+
+.action-btn-expand:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(44, 62, 80, 0.3);
+}
+
+.action-btn-complete {
+  background: var(--success-color);
+  color: white;
+}
+
+.action-btn-complete:hover {
+  background: var(--success-hover);
+}
+
+.action-btn-locked {
+  background: var(--light-gray);
+  color: var(--gray-color);
+  cursor: not-allowed;
+  font-style: italic;
+}
+
+.action-btn-completed {
+  background: var(--success-light);
+  color: var(--success-color);
+  font-weight: 700;
+  cursor: default;
+}
+
+/* Task Assignment Badge */
+.assignment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--info-color);
+  color: white;
+}
+
+.assignment-badge.unassigned {
+  background: var(--warning-light);
+  color: var(--warning-color);
+}
+
+.assignment-badge.assigned-to-me {
+  background: var(--success-light);
+  color: var(--success-color);
+}
+
+.assignment-badge.assigned-to-other {
+  background: var(--light-gray);
+  color: var(--gray-color);
+}
+
+/* Time Estimate Display */
+.time-estimate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--warning-light);
+  color: #92400e;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.time-estimate::before {
+  content: '⏱️';
+  font-size: 14px;
+}
+
+/* Job Completion Status */
+.completion-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--light-gray);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--primary-color);
+}
+
+.completion-progress {
+  flex: 1;
+  height: 8px;
+  background: white;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.completion-progress-bar {
+  height: 100%;
+  background: var(--success-color);
+  transition: width 0.5s ease;
+  border-radius: 4px;
+}
+
+.completion-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dark-color);
+}
+
+/* Fade In Animation for Cards */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.job-card,
+.task-card {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+.job-card:nth-child(1) { animation-delay: 0.05s; }
+.job-card:nth-child(2) { animation-delay: 0.1s; }
+.job-card:nth-child(3) { animation-delay: 0.15s; }
+.job-card:nth-child(4) { animation-delay: 0.2s; }
+.job-card:nth-child(5) { animation-delay: 0.25s; }
+
+/* Pulse Animation for Active Items */
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+  }
+}
+
+.task-card.active {
+  animation: pulse 2s infinite;
+}
+
+/* Shimmer Effect for Loading */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--primary-light) 25%,
+    #dfe6ed 50%,
+    var(--primary-light) 75%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Success Celebration Effect */
+@keyframes celebrate {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.1) rotate(-5deg);
+  }
+  75% {
+    transform: scale(1.1) rotate(5deg);
+  }
+}
+
+.task-card.just-completed {
+  animation: celebrate 0.6s ease-out;
+}
+
+/* Hover Glow Effect */
+.btn-success:hover,
+.action-btn-complete:hover {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.5);
+}
+
+/* Calendar Day Hover Effect */
+@keyframes dayPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.calendar-day:hover {
+  animation: dayPulse 0.3s ease-in-out;
+}
+
+/* Tooltip Enhancement */
+.info-tooltip {
+  position: relative;
+  cursor: help;
+  display: inline-block;
+}
+
+.info-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) scale(0);
+  padding: 8px 12px;
+  background: var(--dark-color);
+  color: white;
+  font-size: 11px;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  opacity: 0;
+  transition: var(--transition-normal);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.info-tooltip:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Priority Indicator */
+.priority-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.priority-high {
+  background: var(--danger-color);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.priority-medium {
+  background: var(--warning-color);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.priority-low {
+  background: var(--success-color);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 16px;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .dashboard-header h1 {
+    font-size: 24px;
+  }
+  
+  .job-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .task-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

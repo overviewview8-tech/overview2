@@ -1,0 +1,98 @@
+.mono-theme {
+  --bg: #f7f7f7;
+  --surface: #ffffff;
+  --text: #111111;
+  --muted: #666666;
+  --border: #dddddd;
+  --accent: #2b2b2b;
+}
+
+/* Apply base background/text inside the themed area */
+.mono-theme {
+  background-color: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.mono-theme * {
+  box-sizing: border-box;
+}
+
+/* Containers and cards */
+.mono-theme div, .mono-theme section, .mono-theme header, .mono-theme main, .mono-theme footer {
+  color: var(--text);
+}
+
+.mono-theme input,
+.mono-theme textarea,
+.mono-theme select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.mono-theme button {
+  background: var(--accent);
+  color: #ffffff;
+  border: 1px solid rgba(0,0,0,0.1);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.mono-theme button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mono-theme a {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* Headings */
+.mono-theme h1, .mono-theme h2, .mono-theme h3, .mono-theme h4 {
+  color: var(--text);
+}
+
+/* Cards / panels */
+.mono-theme .card, .mono-theme .panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+/* Tables/listings */
+.mono-theme table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.mono-theme th, .mono-theme td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+}
+
+/* Small muted text */
+.mono-theme .muted, .mono-theme small {
+  color: var(--muted);
+}
+
+/* Make checkboxes and radios visible on monochrome */
+.mono-theme input[type="checkbox"], .mono-theme input[type="radio"] {
+  width: 16px;
+  height: 16px;
+}
+
+/* Keep images in monochrome area at natural colors but with subtle desaturation optional */
+.mono-theme img {
+  filter: grayscale(20%);
+}
+
+/* ensure the theme container stretches so the background applies */
+.mono-theme .mono-root {
+  min-height: 100vh;
+}
