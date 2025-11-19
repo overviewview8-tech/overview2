@@ -209,46 +209,17 @@ const EmployeeDashboard = () => {
           }).catch(err => console.error('Task email error', err))
         }
 
-        // Verifică dacă TOATE task-urile job-ului sunt completate (inclusiv cele ale altora)
-        const allCompleted = areAllTasksCompleted(updatedTasks, task.job_id)
+        // We still update the UI message but do NOT send a job-completion
+        // email here — only the simpler single-task completion email is
+        // sent to the client to avoid duplicate notifications.
         const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
-
-        if (allCompleted) {
-          if (job && job.client_email) {
-            console.log('🎉 Toate task-urile job-ului sunt completate! Trimit email...')
-            const emailData = {
-              to: job.client_email,
-              clientName: job.client_name,
-              jobName: job.name,
-              tasks: jobTasks,
-              totalValue: job.total_value,
-              completedAt: new Date().toISOString()
-            }
-
-            // Trimite email (async, nu așteaptă)
-            sendJobCompletionEmail(emailData).then(result => {
-              if (result && result.success) {
-                console.log('✅ Email trimis cu succes!')
-                setMessage('✅ Task completat! 🎉 Jobul este finalizat - Email trimis clientului!')
-              } else {
-                console.warn('⚠️ Task completat dar emailul nu a putut fi trimis:', result?.error)
-                setMessage('✅ Task completat! Jobul finalizat. (Email nu a putut fi trimis)')
-              }
-              setTimeout(() => setMessage(null), 5000)
-            }).catch(err => {
-              console.error('Job email error', err)
-              setMessage('✅ Task completat! Jobul finalizat. (Email nu a putut fi trimis)')
-              setTimeout(() => setMessage(null), 5000)
-            })
-          } else {
-            setMessage('✅ Task completat! Jobul este finalizat!')
-            setTimeout(() => setMessage(null), 3000)
-          }
+        const remainingTasks = jobTasks.filter(t => t.status !== 'completed').length
+        if (remainingTasks === 0) {
+          setMessage('✅ Task completat! 🎉 Jobul este finalizat!')
         } else {
-          const remainingTasks = jobTasks.filter(t => t.status !== 'completed').length
           setMessage(`✅ Task completat! (Mai sunt ${remainingTasks} task-uri în job)`)
-          setTimeout(() => setMessage(null), 3000)
         }
+        setTimeout(() => setMessage(null), 4000)
     } catch (err) {
       console.error(err)
       setError(err.message || 'Eroare la actualizare status')

@@ -15,36 +15,46 @@ module.exports = async (req, res) => {
   try {
     const { to, subject, text, html } = req.body || {}
     if (!to || !subject) return res.status(400).json({ error: 'Missing required fields: to, subject' })
-
     const host = process.env.SMTP_HOST
     const port = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587
     const user = process.env.SMTP_USER
     const pass = process.env.SMTP_PASS
     const from = process.env.FROM_EMAIL || user
+    const disableSmtp = String(process.env.DISABLE_SMTP || 'false').toLowerCase() === 'true'
 
-    if (!host || !user || !pass) {
-      console.error('SMTP config missing', { host, user, pass: !!pass })
-      return res.status(500).json({ error: 'SMTP configuration is not set on the server' })
+    let transporter
+    let usedEthereal = false
+
+    // If explicitly disabled or missing SMTP creds, fall back to Ethereal test account
+    if (disableSmtp || !host || !user || !pass) {
+      console.warn('SMTP not fully configured or DISABLE_SMTP=true — using Ethereal test account for local dev')
+      const testAccount = await nodemailer.createTestAccount()
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: { user: testAccount.user, pass: testAccount.pass }
+      })
+      usedEthereal = true
+    } else {
+      const secure = port === 465 || process.env.SMTP_SECURE === 'true'
+      transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } })
     }
 
-    const secure = port === 465 || process.env.SMTP_SECURE === 'true'
-
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      auth: { user, pass }
-    })
-
     const info = await transporter.sendMail({
-      from,
+      from: from || undefined,
       to,
       subject,
       text: text || undefined,
       html: html || undefined
     })
 
-    return res.status(200).json({ ok: true, messageId: info.messageId })
+    const response = { ok: true, messageId: info.messageId }
+    if (usedEthereal) {
+      response.preview = nodemailer.getTestMessageUrl(info) || null
+    }
+
+    return res.status(200).json(response)
   } catch (err) {
     console.error('send-email error', err)
     return res.status(500).json({ error: err.message || 'Failed to send email' })

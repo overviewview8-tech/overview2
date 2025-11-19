@@ -360,28 +360,9 @@ const AdminDashboard = () => {
           }).catch(err => console.error('Task email error', err))
         }
 
-        // Verifică dacă toate task-urile job-ului sunt completate și trimite email de job completat
-        const allCompleted = areAllTasksCompleted(updatedTasks, task.job_id)
-        if (allCompleted) {
-          const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
-          const emailData = {
-            jobName: job?.name,
-            clientName: job?.client_name,
-            clientEmail: job?.client_email,
-            tasks: jobTasks,
-            totalValue: job?.total_value,
-            completedAt: new Date().toISOString()
-          }
-          if (job && job.client_email) {
-            sendJobCompletionEmail(emailData).then(result => {
-              if (result && result.success) {
-                console.log('✅ Email trimis cu succes!')
-              } else {
-                console.warn('⚠️ Job completion email failed', result?.error)
-              }
-            }).catch(err => console.error('Job email error', err))
-          }
-        }
+        // NOTE: Only single-task completion email is sent. Sending a
+        // job-completion email as well produced duplicate notifications
+        // for clients — keep it simple and send only the per-task email.
       }
     } catch (err) {
       console.error(err)

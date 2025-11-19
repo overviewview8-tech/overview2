@@ -356,24 +356,11 @@ export default function CEODashboard() {
           }).catch(err => console.error('Task email error', err))
         }
 
-        // if all tasks completed for the job, also send a job-completed email
-        const allCompleted = areAllTasksCompleted(updatedTasks, task.job_id)
-        if (allCompleted) {
-          const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
-          const emailData = {
-            to: job?.client_email,
-            clientName: job?.client_name,
-            jobName: job?.name,
-            tasks: jobTasks,
-            totalValue: job?.total_value,
-            completedAt: new Date().toISOString()
-          }
-          if (job && job.client_email) {
-            sendJobCompletionEmail(emailData).then(res => {
-              if (res && !res.ok) console.warn('⚠️ Job completion email failed', res)
-            }).catch(err => console.error('Job email error', err))
-          }
-        }
+        // NOTE: only sending the simple single-task completion email.
+        // Previous behavior also sent a job-completion email when all
+        // tasks were completed — that caused duplicate messages for
+        // clients. We intentionally do not send the job-completion
+        // email from the client UI to keep notifications simple.
       }
     } catch (err) {
       console.error(err)
