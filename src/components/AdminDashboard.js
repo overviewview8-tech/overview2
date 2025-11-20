@@ -494,7 +494,7 @@ const AdminDashboard = () => {
             taskDescription: updatedTask.description,
             taskValue: updatedTask.value,
             completedAt: updatedTask.completed_at || new Date().toISOString()
-          }).then(res => {
+          }, { pdfUrl: window.location.origin + '/template.pdf' }).then(res => {
             if (res && !res.ok) console.warn('⚠️ Task email failed', res)
           }).catch(err => console.error('Task email error', err))
         }

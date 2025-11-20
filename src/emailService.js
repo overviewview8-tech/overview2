@@ -33,11 +33,13 @@ export async function sendTaskCompletionEmail({ to, clientName, jobName, taskNam
     }
     payload.pdfData = pdfData
   }
+  // allow sending a remote PDF URL (public) to be fetched by the server
+  if (options.pdfUrl) payload.pdfUrl = options.pdfUrl
 
   return postSendEmail(payload)
 }
 
-export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt }) {
+export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt }, options = {}) {
   if (!to) return { ok: false, error: 'No recipient' }
   const subject = `Job finalizat: ${jobName}`
   const taskList = tasks.map(t => `- ${t.name} (${t.value ? t.value + ' lei' : 'N/A'})`).join('\n')
@@ -45,6 +47,10 @@ export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = 
   const text = `Bună ${clientName || ''},\n\nJobul "${jobName}" a fost finalizat la ${completedAt || new Date().toLocaleString()}.\n\nTaskuri:\n${taskList}\n\nValoare totală: ${totalValue != null ? totalValue + ' lei' : 'N/A'}`
   const html = `<p>Bună ${clientName || ''},</p><p>Jobul <strong>${jobName}</strong> a fost finalizat la ${completedAt || new Date().toLocaleString()}.</p><ul>${htmlTasks}</ul><p><strong>Valoare totală:</strong> ${totalValue != null ? totalValue + ' lei' : 'N/A'}</p>`
   // Also request a generated PDF with all client/job/task data
+  // prefer options.pdfUrl if provided — server will fetch and attach it
+  if (options.pdfUrl) {
+    return postSendEmail({ to, subject, text, html, pdfUrl: options.pdfUrl })
+  }
   const pdfData = { clientName, clientEmail: to, jobName, tasks, totalValue, completedAt }
   return postSendEmail({ to, subject, text, html, pdfData })
 }
