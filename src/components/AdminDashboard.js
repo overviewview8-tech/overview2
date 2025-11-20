@@ -17,6 +17,7 @@ const AdminDashboard = () => {
   const [jobname, setJobname] = useState('')
   const [clientname, setClientname] = useState('')
   const [clientemail, setClientemail] = useState('')
+  const [jobPriority, setJobPriority] = useState('normal')
   const [jobValue, setJobValue] = useState('')
   const [clientFirstName, setClientFirstName] = useState('')
   const [clientLastName, setClientLastName] = useState('')
@@ -185,6 +186,7 @@ const AdminDashboard = () => {
 
       const { data: newJob, error: jobErr } = await supabase.from('jobs').insert([{
         name: jobname,
+        priority: jobPriority || 'normal',
         client_name: fullClientName,
         client_first_name: clientFirstName || null,
         client_last_name: clientLastName || null,
@@ -193,7 +195,7 @@ const AdminDashboard = () => {
         client_address: clientAddress || null,
         client_email: clientemail || null,
         status: 'todo',
-        created_by: user.id,
+        creator_id: user.id,
         total_value: 0
       }]).select()
       if (jobErr) throw jobErr
@@ -211,7 +213,7 @@ const AdminDashboard = () => {
         assigned_to_emails: null,
         estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
         value: null,
-        created_by: user.id
+        creator_id: user.id
       }))
 
       // Safe insert: try inserting as-is (with arrays). If the DB still
@@ -241,6 +243,7 @@ const AdminDashboard = () => {
 
       setJobname('')
       setClientname('')
+      setJobPriority('normal')
       setClientFirstName('')
       setClientLastName('')
       setClientIdSeries('')
@@ -281,6 +284,7 @@ const AdminDashboard = () => {
     setEditingJobId(job.id)
     setJobEdits({
       name: job.name,
+      priority: job.priority || 'normal',
       client_name: job.client_name || '',
       client_first_name: job.client_first_name || '',
       client_last_name: job.client_last_name || '',
@@ -311,6 +315,7 @@ const AdminDashboard = () => {
          calculated from task values and updated automatically. */
       if (jobEdits.client_first_name !== undefined) updates.client_first_name = jobEdits.client_first_name || null
       if (jobEdits.client_last_name !== undefined) updates.client_last_name = jobEdits.client_last_name || null
+      if (jobEdits.priority !== undefined) updates.priority = jobEdits.priority || 'normal'
       if (jobEdits.client_id_series !== undefined) updates.client_id_series = jobEdits.client_id_series || null
       if (jobEdits.client_cnp !== undefined) updates.client_cnp = jobEdits.client_cnp || null
       if (jobEdits.client_address !== undefined) updates.client_address = jobEdits.client_address || null
@@ -532,7 +537,7 @@ const AdminDashboard = () => {
         assigned_to_emails: null,
         estimated_hours: newTaskData.estimated_hours ? parseFloat(newTaskData.estimated_hours) : null,
         value: null,
-        created_by: user.id
+        creator_id: user.id
       }
       // Insert with same safe-retry logic as bulk insert
       try {
@@ -956,7 +961,14 @@ const AdminDashboard = () => {
           {showCreateWithTasks && (
             <form onSubmit={handleCreateJob}>
               <div>
-                <input placeholder="Job Name" value={jobname} onChange={e => setJobname(e.target.value)} required />
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input placeholder="Job Name" value={jobname} onChange={e => setJobname(e.target.value)} required />
+                  <select value={jobPriority} onChange={e => setJobPriority(e.target.value)} style={{ padding: 6 }}>
+                    <option value="normal">Normal</option>
+                    <option value="repede">Repede</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
                 <input placeholder="Client Name (full)" value={clientname} onChange={e => setClientname(e.target.value)} />
                 <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                   <input placeholder="Client Prenume" value={clientFirstName} onChange={e => setClientFirstName(e.target.value)} style={{ flex: '1 1 150px' }} />
@@ -1049,6 +1061,11 @@ const AdminDashboard = () => {
                     onChange={e => setJobEdits(prev => ({ ...prev, client_email: e.target.value }))}
                     style={{ marginRight: 8 }}
                   />
+                  <select value={jobEdits.priority || 'normal'} onChange={e => setJobEdits(prev => ({ ...prev, priority: e.target.value }))} style={{ marginRight: 8 }}>
+                    <option value="normal">Normal</option>
+                    <option value="repede">Repede</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
                   {/* Admin cannot manually edit job total; it's calculated from task values */}
                   <select value={jobEdits.status || 'todo'} onChange={e => setJobEdits(prev => ({ ...prev, status: e.target.value }))} style={{ marginRight: 8 }}>
                     <option value="todo">Todo</option>

@@ -13,12 +13,28 @@ async function postSendEmail(payload) {
   }
 }
 
-export async function sendTaskCompletionEmail({ to, clientName, jobName, taskName, taskDescription, taskValue, completedAt }) {
+export async function sendTaskCompletionEmail({ to, clientName, jobName, taskName, taskDescription, taskValue, completedAt }, options = {}) {
   if (!to) return { ok: false, error: 'No recipient' }
   const subject = `Task finalizat: ${taskName}`
   const text = `Bună ${clientName || ''},\n\nTask-ul "${taskName}" din jobul "${jobName}" a fost marcat ca finalizat la ${completedAt || new Date().toLocaleString()}.\n\nDescriere: ${taskDescription || 'N/A'}\nValoare: ${taskValue != null ? taskValue + ' lei' : 'N/A'}\n\nMulțumim!`;
   const html = `<p>Bună ${clientName || ''},</p><p>Task-ul <strong>${taskName}</strong> din jobul <strong>${jobName}</strong> a fost marcat ca finalizat la ${completedAt || new Date().toLocaleString()}.</p><p><strong>Descriere:</strong> ${taskDescription || 'N/A'}<br/><strong>Valoare:</strong> ${taskValue != null ? taskValue + ' lei' : 'N/A'}</p><p>Mulțumim!</p>`
-  return postSendEmail({ to, subject, text, html })
+
+  // By default do NOT request a PDF. Pass { includePdf: true } in options to attach a PDF.
+  const includePdf = options.includePdf === true
+  const payload = { to, subject, text, html }
+  if (includePdf) {
+    const pdfData = {
+      clientName,
+      clientEmail: to,
+      jobName,
+      tasks: [{ name: taskName, description: taskDescription, value: taskValue }],
+      totalValue: taskValue != null ? taskValue : null,
+      completedAt
+    }
+    payload.pdfData = pdfData
+  }
+
+  return postSendEmail(payload)
 }
 
 export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt }) {

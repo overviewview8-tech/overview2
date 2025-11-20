@@ -17,6 +17,7 @@ export default function CEODashboard() {
   const [jobname, setJobname] = useState('')
   const [clientname, setClientname] = useState('')
   const [clientemail, setClientemail] = useState('')
+  const [jobPriority, setJobPriority] = useState('normal')
   const [clientFirstName, setClientFirstName] = useState('')
   const [clientLastName, setClientLastName] = useState('')
   const [clientIdSeries, setClientIdSeries] = useState('')
@@ -188,6 +189,7 @@ export default function CEODashboard() {
 
       const { data: newJob, error: jobErr } = await supabase.from('jobs').insert([{
         name: jobname,
+        priority: jobPriority || 'normal',
         client_name: fullClientName,
         client_first_name: clientFirstName || null,
         client_last_name: clientLastName || null,
@@ -196,7 +198,7 @@ export default function CEODashboard() {
         client_address: clientAddress || null,
         client_email: clientemail || null,
         status: 'todo',
-        created_by: user?.id || null,
+        creator_id: user?.id || null,
         total_value: jobValue ? parseFloat(jobValue) : 0
       }]).select()
       if (jobErr) throw jobErr
@@ -213,7 +215,7 @@ export default function CEODashboard() {
           assigned_to_emails: null,
           estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
           value: t.value ? parseFloat(t.value) : null,
-          created_by: user?.id || null
+          creator_id: user?.id || null
         }))
 
       if (tasksToInsert.length > 0) {
@@ -248,6 +250,7 @@ export default function CEODashboard() {
 
       setJobname('')
       setClientname('')
+      setJobPriority('normal')
       setClientFirstName('')
       setClientLastName('')
       setClientIdSeries('')
@@ -284,6 +287,7 @@ export default function CEODashboard() {
     setEditingJobId(job.id)
     setJobEdits({
       name: job.name,
+      priority: job.priority || 'normal',
       client_name: job.client_name,
       client_first_name: job.client_first_name || '',
       client_last_name: job.client_last_name || '',
@@ -315,6 +319,7 @@ export default function CEODashboard() {
       }
       if (jobEdits.client_first_name !== undefined) updates.client_first_name = jobEdits.client_first_name || null
       if (jobEdits.client_last_name !== undefined) updates.client_last_name = jobEdits.client_last_name || null
+      if (jobEdits.priority !== undefined) updates.priority = jobEdits.priority || 'normal'
       if (jobEdits.client_id_series !== undefined) updates.client_id_series = jobEdits.client_id_series || null
       if (jobEdits.client_cnp !== undefined) updates.client_cnp = jobEdits.client_cnp || null
       if (jobEdits.client_address !== undefined) updates.client_address = jobEdits.client_address || null
@@ -521,7 +526,7 @@ export default function CEODashboard() {
         assigned_to_emails: null,
         estimated_hours: newTaskData.estimated_hours ? parseFloat(newTaskData.estimated_hours) : null,
         value: newTaskData.value ? parseFloat(newTaskData.value) : null,
-        created_by: user?.id || null
+        creator_id: user?.id || null
       }
       const { error: addErr } = await supabase.from('tasks').insert([taskToInsert])
       if (addErr) throw addErr
@@ -959,7 +964,14 @@ export default function CEODashboard() {
           {showCreateWithTasks && (
             <form onSubmit={handleCreateJob}>
               <div>
-                <input placeholder="Job Name" value={jobname} onChange={e => setJobname(e.target.value)} required />
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input placeholder="Job Name" value={jobname} onChange={e => setJobname(e.target.value)} required style={{ flex: '1 1 auto' }} />
+                  <select value={jobPriority} onChange={e => setJobPriority(e.target.value)} style={{ padding: 6 }}>
+                    <option value="normal">Normal</option>
+                    <option value="repede">Repede</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
                 <input placeholder="Client Name (full)" value={clientname} onChange={e => setClientname(e.target.value)} />
                 <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                   <input placeholder="Client Prenume" value={clientFirstName} onChange={e => setClientFirstName(e.target.value)} style={{ flex: '1 1 150px' }} />
@@ -1036,6 +1048,11 @@ export default function CEODashboard() {
                   <input placeholder="CNP" value={jobEdits.client_cnp || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_cnp: e.target.value }))} style={{ marginTop: 6 }} />
                   <input placeholder="Adresa" value={jobEdits.client_address || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_address: e.target.value }))} style={{ marginTop: 6 }} />
                   <input type="email" placeholder="Email Client" value={jobEdits.client_email || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_email: e.target.value }))} style={{ marginRight: 8, marginTop: 6 }} />
+                  <select value={jobEdits.priority || 'normal'} onChange={e => setJobEdits(prev => ({ ...prev, priority: e.target.value }))} style={{ marginRight: 8, marginTop: 6, padding: 6 }}>
+                    <option value="normal">Normal</option>
+                    <option value="repede">Repede</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
                   <input type="number" placeholder="Valoare job (lei)" value={jobEdits.total_value || ''} onChange={e => setJobEdits(prev => ({ ...prev, total_value: e.target.value }))} style={{ marginRight: 8, marginTop: 6 }} step="0.01" min="0" />
                   <select value={jobEdits.status || 'todo'} onChange={e => setJobEdits(prev => ({ ...prev, status: e.target.value }))} style={{ marginRight: 8, marginTop: 6 }}>
                     <option value="todo">Todo</option>
@@ -1047,7 +1064,11 @@ export default function CEODashboard() {
               ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div>
-                      <strong>{job.name}</strong> - {job.client_name} ({job.status})
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <strong>{job.name}</strong>
+                        <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 12, color: 'white', textTransform: 'capitalize', backgroundColor: job.priority === 'urgent' ? '#f44336' : job.priority === 'repede' ? '#FF9800' : '#607D8B' }}>{job.priority || 'normal'}</span>
+                        <span style={{ color: '#666' }}> - {job.client_name} ({job.status})</span>
+                      </div>
                     
                       <div style={{ fontSize: 12, color: '#333' }}>💰 Valoare job: {job.total_value != null ? parseFloat(job.total_value).toFixed(2) + ' lei' : 'N/A'}</div>
                     <div style={{ fontSize: 11, color: '#666' }}>⏱️ Timp estimat: <strong>{formatDuration(totalHours)}</strong>{totalHours > 0 && ` → Estimare finalizare: ${formatEstimatedDate(totalHours)}`}</div>
