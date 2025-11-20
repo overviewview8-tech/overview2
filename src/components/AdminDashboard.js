@@ -17,7 +17,13 @@ const AdminDashboard = () => {
   const [jobname, setJobname] = useState('')
   const [clientname, setClientname] = useState('')
   const [clientemail, setClientemail] = useState('')
-  const [newJobTasks, setNewJobTasks] = useState([{ name: '', assigned_to: '', estimated_hours: '' }])
+  const [jobValue, setJobValue] = useState('')
+  const [clientFirstName, setClientFirstName] = useState('')
+  const [clientLastName, setClientLastName] = useState('')
+  const [clientIdSeries, setClientIdSeries] = useState('')
+  const [clientCNP, setClientCNP] = useState('')
+  const [clientAddress, setClientAddress] = useState('')
+  const [newJobTasks, setNewJobTasks] = useState([{ name: '', description: '', assigned_to: [], estimated_hours: '' }])
 
   // Stare pentru job expandat
   const [expandedJob, setExpandedJob] = useState(null)
@@ -31,7 +37,7 @@ const AdminDashboard = () => {
 
   // Stare pentru adăugare task la job existent
   const [addingTaskToJob, setAddingTaskToJob] = useState(null)
-  const [newTaskData, setNewTaskData] = useState({ name: '', assigned_to: '', estimated_hours: '' })
+  const [newTaskData, setNewTaskData] = useState({ name: '', description: '', assigned_to: [], estimated_hours: '' })
 
   // Stare gestionare angajați
   const [showEmployeeManagement, setShowEmployeeManagement] = useState(false)
@@ -65,9 +71,20 @@ const AdminDashboard = () => {
       if (tasksRes.error) throw tasksRes.error
       if (profilesRes.error) throw profilesRes.error
 
+      const profilesData = profilesRes.data || []
+
+      // Normalize assigned_to to always be an array (DB might have scalar or array)
+      const tasksNormalized = (tasksRes.data || []).map(t => {
+        let assigned = []
+        if (Array.isArray(t.assigned_to)) assigned = t.assigned_to
+        else if (t.assigned_to) assigned = [t.assigned_to]
+        const assignedEmails = Array.isArray(t.assigned_to_emails) ? t.assigned_to_emails : (t.assigned_to_email ? [t.assigned_to_email] : assigned.map(pid => (profilesData.find(p => p.id === pid) || {}).email).filter(Boolean))
+        return { ...t, assigned_to: assigned, assigned_to_emails: assignedEmails }
+      })
+
       setJobs(jobsRes.data || [])
-      setTasks(tasksRes.data || [])
-      setProfiles(profilesRes.data || [])
+      setTasks(tasksNormalized)
+      setProfiles(profilesData)
     } catch (err) {
       console.error(err)
       setError(err.message || 'Eroare la încărcare date')
@@ -96,6 +113,27 @@ const AdminDashboard = () => {
   const displayUserLabel = (profile) => {
     if (!profile) return '(Neasignat)'
     return profile.full_name ? `${profile.full_name} (${profile.email})` : profile.email
+  }
+
+  // Multi-assign selector (checkbox list) to allow easy multi-selection
+  const MultiAssignSelector = ({ profiles, selectedIds = [], onChange }) => {
+    const toggle = (id) => {
+      const curr = Array.isArray(selectedIds) ? [...selectedIds] : []
+      const idx = curr.indexOf(id)
+      if (idx === -1) curr.push(id)
+      else curr.splice(idx, 1)
+      onChange(curr)
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflow: 'auto' }}>
+        {(profiles || []).map(p => (
+          <label key={p?.id} style={{ fontSize: 13 }}>
+            <input type="checkbox" checked={Array.isArray(selectedIds) && selectedIds.includes(p.id)} onChange={() => toggle(p.id)} />{' '}
+            {displayUserLabel(p)}
+          </label>
+        ))}
+      </div>
+    )
   }
 
   // Helper pentru durata estimată
@@ -143,9 +181,16 @@ const AdminDashboard = () => {
     setLoading(true)
     setError(null)
     try {
+      const fullClientName = (clientFirstName || clientLastName) ? `${clientFirstName || ''} ${clientLastName || ''}`.trim() : clientname
+
       const { data: newJob, error: jobErr } = await supabase.from('jobs').insert([{
         name: jobname,
-        client_name: clientname,
+        client_name: fullClientName,
+        client_first_name: clientFirstName || null,
+        client_last_name: clientLastName || null,
+        client_id_series: clientIdSeries || null,
+        client_cnp: clientCNP || null,
+        client_address: clientAddress || null,
         client_email: clientemail || null,
         status: 'todo',
         created_by: user.id,
@@ -154,27 +199,55 @@ const AdminDashboard = () => {
       if (jobErr) throw jobErr
 
       const jobId = newJob[0].id
-      const tasksToInsert = newJobTasks
-        .filter(t => t.name.trim())
-        .map(t => ({
-          job_id: jobId,
-          name: t.name,
-          status: 'todo',
-          assigned_to: t.assigned_to || null,
-          assigned_to_email: t.assigned_to ? profiles.find(p => p.id === t.assigned_to)?.email : null,
-          estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
-          created_by: user.id
-        }))
+      const filteredTasks = newJobTasks.filter(t => t.name && t.name.trim())
+      const tasksToInsert = filteredTasks.map(t => ({
+        job_id: jobId,
+        name: t.name,
+        description: t.description || null,
+        status: 'todo',
+        // write assigned_to as array (Admin selects multiple)
+        assigned_to: Array.isArray(t.assigned_to) ? t.assigned_to : (t.assigned_to ? [t.assigned_to] : []),
+        // keep assigned_to_emails null for DB (can be populated by a trigger or later job)
+        assigned_to_emails: null,
+        estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
+        value: null,
+        created_by: user.id
+      }))
+
+      // Safe insert: try inserting as-is (with arrays). If the DB still
+      // has a scalar `assigned_to` column, Postgres may return a 22P02
+      // invalid-input error (array sent to uuid). In that case, retry
+      // by sending only the first assignee (backwards-compatible).
+      const attemptInsertTasks = async (rows) => {
+        try {
+          const { data: insertedTasks, error: tasksErr } = await supabase.from('tasks').insert(rows).select()
+          if (tasksErr) throw tasksErr
+          return insertedTasks
+        } catch (err) {
+          // detect Postgres UUID array mismatch error
+          if (err?.message && err.message.includes('invalid input syntax for type uuid')) {
+            const transformed = rows.map(r => ({ ...r, assigned_to: Array.isArray(r.assigned_to) && r.assigned_to.length > 0 ? r.assigned_to[0] : r.assigned_to }))
+            const { data: retried, error: retryErr } = await supabase.from('tasks').insert(transformed).select()
+            if (retryErr) throw retryErr
+            return retried
+          }
+          throw err
+        }
+      }
 
       if (tasksToInsert.length > 0) {
-        const { error: tasksErr } = await supabase.from('tasks').insert(tasksToInsert)
-        if (tasksErr) throw tasksErr
+        await attemptInsertTasks(tasksToInsert)
       }
 
       setJobname('')
       setClientname('')
+      setClientFirstName('')
+      setClientLastName('')
+      setClientIdSeries('')
+      setClientCNP('')
+      setClientAddress('')
       setClientemail('')
-      setNewJobTasks([{ name: '', assigned_to: '', estimated_hours: '' }])
+      setNewJobTasks([{ name: '', description: '', assigned_to: [], estimated_hours: '' }])
       setShowCreateWithTasks(false)
       setMessage('✅ Job și taskuri create!')
       setTimeout(() => setMessage(null), 3000)
@@ -196,7 +269,7 @@ const AdminDashboard = () => {
   }
 
   const addNewJobTask = () => {
-    setNewJobTasks(prev => [...prev, { name: '', assigned_to: '', estimated_hours: '' }])
+    setNewJobTasks(prev => [...prev, { name: '', description: '', assigned_to: [], estimated_hours: '' }])
   }
 
   const removeNewJobTask = (idx) => {
@@ -206,7 +279,18 @@ const AdminDashboard = () => {
   // Editare job
   const startEditJob = (job) => {
     setEditingJobId(job.id)
-    setJobEdits({ name: job.name, client_name: job.client_name, client_email: job.client_email || '', status: job.status })
+    setJobEdits({
+      name: job.name,
+      client_name: job.client_name || '',
+      client_first_name: job.client_first_name || '',
+      client_last_name: job.client_last_name || '',
+      client_id_series: job.client_id_series || '',
+      client_cnp: job.client_cnp || '',
+      client_address: job.client_address || '',
+      client_email: job.client_email || '',
+      status: job.status,
+      total_value: job.total_value != null ? job.total_value : ''
+    })
   }
 
   const cancelEditJob = () => {
@@ -223,6 +307,14 @@ const AdminDashboard = () => {
       if (jobEdits.client_name !== undefined) updates.client_name = jobEdits.client_name
       if (jobEdits.client_email !== undefined) updates.client_email = jobEdits.client_email || null
       if (jobEdits.status !== undefined) updates.status = jobEdits.status
+      /* Admin is not allowed to manually edit job total here; total_value is
+         calculated from task values and updated automatically. */
+      if (jobEdits.client_first_name !== undefined) updates.client_first_name = jobEdits.client_first_name || null
+      if (jobEdits.client_last_name !== undefined) updates.client_last_name = jobEdits.client_last_name || null
+      if (jobEdits.client_id_series !== undefined) updates.client_id_series = jobEdits.client_id_series || null
+      if (jobEdits.client_cnp !== undefined) updates.client_cnp = jobEdits.client_cnp || null
+      if (jobEdits.client_address !== undefined) updates.client_address = jobEdits.client_address || null
+      // job-level description removed; task-level descriptions are used instead
 
       const { data, error: updErr } = await supabase.from('jobs').update(updates).eq('id', jobId).select()
       if (updErr) throw updErr
@@ -266,7 +358,7 @@ const AdminDashboard = () => {
       name: task.name,
       description: task.description || '',
       status: task.status,
-      assigned_to: task.assigned_to || '',
+      assigned_to: Array.isArray(task.assigned_to) ? task.assigned_to : task.assigned_to ? [task.assigned_to] : [],
       estimated_hours: task.estimated_hours || ''
     })
   }
@@ -284,21 +376,53 @@ const AdminDashboard = () => {
       if (taskEdits.name !== undefined) updates.name = taskEdits.name
       if (taskEdits.description !== undefined) updates.description = taskEdits.description
       if (taskEdits.status !== undefined) updates.status = taskEdits.status
+      // assignments are stored in tasks.assigned_to array column; include them in updates
       if (taskEdits.assigned_to !== undefined) {
-        updates.assigned_to = taskEdits.assigned_to || null
-        updates.assigned_to_email = taskEdits.assigned_to ? profiles.find(p => p.id === taskEdits.assigned_to)?.email : null
+        updates.assigned_to = Array.isArray(taskEdits.assigned_to) ? taskEdits.assigned_to : taskEdits.assigned_to ? [taskEdits.assigned_to] : []
       }
       if (taskEdits.estimated_hours !== undefined) {
         updates.estimated_hours = taskEdits.estimated_hours ? parseFloat(taskEdits.estimated_hours) : null
       }
 
-      const { data, error: updErr } = await supabase.from('tasks').update(updates).eq('id', taskId).select()
-      if (updErr) throw updErr
-      setTasks(prev => prev.map(t => t.id === taskId ? data[0] : t))
+      // Try update, if DB expects scalar uuid for `assigned_to` and errors,
+      // retry with first element to remain compatible until migration runs.
+      let data
+      try {
+        const res = await supabase.from('tasks').update(updates).eq('id', taskId).select()
+        if (res.error) throw res.error
+        data = res.data
+      } catch (err) {
+        if (err?.message && err.message.includes('invalid input syntax for type uuid')) {
+          const backCompat = { ...updates }
+          if (Array.isArray(backCompat.assigned_to)) backCompat.assigned_to = backCompat.assigned_to.length > 0 ? backCompat.assigned_to[0] : null
+          const res2 = await supabase.from('tasks').update(backCompat).eq('id', taskId).select()
+          if (res2.error) throw res2.error
+          data = res2.data
+        } else {
+          throw err
+        }
+      }
+      const { data: refreshedArr, error: refErr } = await supabase.from('tasks').select('*').eq('id', taskId).single()
+      if (refErr) throw refErr
+      const refreshedTask = refreshedArr
+      const assignedIds = Array.isArray(refreshedTask.assigned_to) ? refreshedTask.assigned_to : (refreshedTask.assigned_to ? [refreshedTask.assigned_to] : [])
+      const assignedEmails = assignedIds.map(pid => (profiles.find(p => p.id === pid) || {}).email).filter(Boolean)
+      const newTaskObj = { ...refreshedTask, assigned_to: assignedIds, assigned_to_emails: assignedEmails }
+      setTasks(prev => prev.map(t => t.id === taskId ? newTaskObj : t))
       setEditingTaskId(null)
       setTaskEdits({})
       setMessage('✅ Task actualizat!')
       setTimeout(() => setMessage(null), 3000)
+      // recalc job total in case task value changed
+      if (data && data[0] && data[0].job_id) {
+        const jobId = data[0].job_id
+        const { data: jobTasks, error } = await supabase.from('tasks').select('value').eq('job_id', jobId)
+        if (!error) {
+          const total = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
+          await supabase.from('jobs').update({ total_value: total }).eq('id', jobId)
+          setJobs(prev => prev.map(j => j.id === jobId ? { ...j, total_value: total } : j))
+        }
+      }
     } catch (err) {
       console.error(err)
       setError(err.message || 'Eroare la actualizare task')
@@ -312,11 +436,21 @@ const AdminDashboard = () => {
     setLoading(true)
     setError(null)
     try {
+      const task = tasks.find(t => t.id === taskId)
       const { error: delErr } = await supabase.from('tasks').delete().eq('id', taskId)
       if (delErr) throw delErr
       setTasks(prev => prev.filter(t => t.id !== taskId))
       setMessage('✅ Task șters!')
       setTimeout(() => setMessage(null), 3000)
+      if (task && task.job_id) {
+        // recalc job total
+        const { data: jobTasks, error } = await supabase.from('tasks').select('value').eq('job_id', task.job_id)
+        if (!error) {
+          const total = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
+          await supabase.from('jobs').update({ total_value: total }).eq('id', task.job_id)
+          setJobs(prev => prev.map(j => j.id === task.job_id ? { ...j, total_value: total } : j))
+        }
+      }
     } catch (err) {
       console.error(err)
       setError(err.message || 'Eroare la ștergere task')
@@ -375,12 +509,12 @@ const AdminDashboard = () => {
   // Adăugare task la job existent
   const startAddTaskToJob = (jobId) => {
     setAddingTaskToJob(jobId)
-    setNewTaskData({ name: '', assigned_to: '', estimated_hours: '' })
+    setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '' })
   }
 
   const cancelAddTask = () => {
     setAddingTaskToJob(null)
-    setNewTaskData({ name: '', assigned_to: '', estimated_hours: '' })
+    setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '' })
   }
 
   const handleAddTask = async (e) => {
@@ -388,19 +522,33 @@ const AdminDashboard = () => {
     setLoading(true)
     setError(null)
     try {
+      const assignedArr = Array.isArray(newTaskData.assigned_to) ? newTaskData.assigned_to : newTaskData.assigned_to ? [newTaskData.assigned_to] : []
       const taskToInsert = {
         job_id: addingTaskToJob,
         name: newTaskData.name,
         status: 'todo',
-        assigned_to: newTaskData.assigned_to || null,
-        assigned_to_email: newTaskData.assigned_to ? profiles.find(p => p.id === newTaskData.assigned_to)?.email : null,
+        description: newTaskData.description || null,
+        assigned_to: assignedArr.length > 0 ? assignedArr : null,
+        assigned_to_emails: null,
         estimated_hours: newTaskData.estimated_hours ? parseFloat(newTaskData.estimated_hours) : null,
+        value: null,
         created_by: user.id
       }
-      const { error: addErr } = await supabase.from('tasks').insert([taskToInsert])
-      if (addErr) throw addErr
+      // Insert with same safe-retry logic as bulk insert
+      try {
+        const { data: inserted, error: addErr } = await supabase.from('tasks').insert([taskToInsert]).select()
+        if (addErr) throw addErr
+      } catch (err) {
+        if (err?.message && err.message.includes('invalid input syntax for type uuid')) {
+          const transformed = { ...taskToInsert, assigned_to: Array.isArray(taskToInsert.assigned_to) && taskToInsert.assigned_to.length > 0 ? taskToInsert.assigned_to[0] : taskToInsert.assigned_to }
+          const { data: retried, error: retryErr } = await supabase.from('tasks').insert([transformed]).select()
+          if (retryErr) throw retryErr
+        } else {
+          throw err
+        }
+      }
 
-      setNewTaskData({ name: '', assigned_to: '', estimated_hours: '' })
+      setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '' })
       setAddingTaskToJob(null)
       setMessage('✅ Task adăugat!')
       setTimeout(() => setMessage(null), 3000)
@@ -809,34 +957,42 @@ const AdminDashboard = () => {
             <form onSubmit={handleCreateJob}>
               <div>
                 <input placeholder="Job Name" value={jobname} onChange={e => setJobname(e.target.value)} required />
-                <input placeholder="Client Name" value={clientname} onChange={e => setClientname(e.target.value)} required />
+                <input placeholder="Client Name (full)" value={clientname} onChange={e => setClientname(e.target.value)} />
+                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  <input placeholder="Client Prenume" value={clientFirstName} onChange={e => setClientFirstName(e.target.value)} style={{ flex: '1 1 150px' }} />
+                  <input placeholder="Client Nume" value={clientLastName} onChange={e => setClientLastName(e.target.value)} style={{ flex: '1 1 150px' }} />
+                </div>
+                <input placeholder="Serie buletin" value={clientIdSeries} onChange={e => setClientIdSeries(e.target.value)} style={{ marginTop: 6 }} />
+                <input placeholder="CNP" value={clientCNP} onChange={e => setClientCNP(e.target.value)} style={{ marginTop: 6 }} />
+                <input placeholder="Adresa" value={clientAddress} onChange={e => setClientAddress(e.target.value)} style={{ marginTop: 6 }} />
                 <input type="email" placeholder="Client Email" value={clientemail} onChange={e => setClientemail(e.target.value)} />
+                {/* Job value is managed automatically from task values; hidden in Admin UI */}
               </div>
 
               <div style={{ marginTop: 8, borderTop: '1px dashed #ddd', paddingTop: 8 }}>
                 <h4>Taskuri pentru job</h4>
                 {newJobTasks.map((t, i) => (
-                  <div key={i} style={{ marginBottom: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input placeholder="Nume task" value={t.name} onChange={e => updateNewJobTaskField(i, 'name', e.target.value)} required />
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <label style={{ fontSize: 12, marginRight: 4 }}>Ore:</label>
-                      <input
-                        type="number"
-                        placeholder="Ore"
-                        value={t.estimated_hours}
-                        onChange={e => updateNewJobTaskField(i, 'estimated_hours', e.target.value)}
-                        style={{ width: 80 }}
-                        step="0.5"
-                        min="0"
-                      />
+                  <div key={i} style={{ marginBottom: 8, display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap', border: '1px solid #eee', padding: 8, borderRadius: 6, background: 'white' }}>
+                    <div style={{ flex: '1 1 320px', minWidth: 260 }}>
+                      <input placeholder="Nume task" value={t.name} onChange={e => updateNewJobTaskField(i, 'name', e.target.value)} required style={{ width: '100%', marginBottom: 6, padding: 8 }} />
+                      <textarea placeholder="Descriere" value={t.description || ''} onChange={e => updateNewJobTaskField(i, 'description', e.target.value)} style={{ width: '100%', marginBottom: 6, minHeight: 80, padding: 8 }} />
                     </div>
-                    <select value={t.assigned_to} onChange={e => updateNewJobTaskField(i, 'assigned_to', e.target.value)}>
-                      <option value="">Neasignat</option>
-                      {profiles.map(p => (
-                        <option key={p.id} value={p.id}>{displayUserLabel(p)}</option>
-                      ))}
-                    </select>
-                    <button type="button" onClick={() => removeNewJobTask(i)} style={{ fontSize: 12, color: 'red' }}>Șterge</button>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 140 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <label style={{ fontSize: 12 }}>Ore:</label>
+                        <input type="number" placeholder="Ore" value={t.estimated_hours} onChange={e => updateNewJobTaskField(i, 'estimated_hours', e.target.value)} style={{ width: 96, padding: 6 }} step="0.5" min="0" />
+                      </div>
+                      {/* Admin should not set task value; values are managed from CEO or task calculations */}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 200 }}>
+                      <MultiAssignSelector profiles={profiles} selectedIds={t.assigned_to || []} onChange={v => updateNewJobTaskField(i, 'assigned_to', v)} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button type="button" onClick={() => removeNewJobTask(i)} style={{ fontSize: 12, color: 'red' }}>Șterge</button>
+                        <button type="button" onClick={addNewJobTask} style={{ fontSize: 12 }}>+ Adaugă task</button>
+                      </div>
+                    </div>
                   </div>
                 ))}
                 <button type="button" onClick={addNewJobTask} style={{ fontSize: 12 }}>+ Adaugă task</button>
@@ -873,11 +1029,19 @@ const AdminDashboard = () => {
                     style={{ marginRight: 8 }}
                   />
                   <input
-                    placeholder="Nume Client"
+                    placeholder="Nume Client (full)"
                     value={jobEdits.client_name || ''}
                     onChange={e => setJobEdits(prev => ({ ...prev, client_name: e.target.value }))}
                     style={{ marginRight: 8 }}
                   />
+                  
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                    <input placeholder="Client Prenume" value={jobEdits.client_first_name || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_first_name: e.target.value }))} style={{ flex: '1 1 150px' }} />
+                    <input placeholder="Client Nume" value={jobEdits.client_last_name || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_last_name: e.target.value }))} style={{ flex: '1 1 150px' }} />
+                  </div>
+                  <input placeholder="Serie buletin" value={jobEdits.client_id_series || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_id_series: e.target.value }))} style={{ marginTop: 6 }} />
+                  <input placeholder="CNP" value={jobEdits.client_cnp || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_cnp: e.target.value }))} style={{ marginTop: 6 }} />
+                  <input placeholder="Adresa" value={jobEdits.client_address || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_address: e.target.value }))} style={{ marginTop: 6 }} />
                   <input
                     type="email"
                     placeholder="Email Client"
@@ -885,6 +1049,7 @@ const AdminDashboard = () => {
                     onChange={e => setJobEdits(prev => ({ ...prev, client_email: e.target.value }))}
                     style={{ marginRight: 8 }}
                   />
+                  {/* Admin cannot manually edit job total; it's calculated from task values */}
                   <select value={jobEdits.status || 'todo'} onChange={e => setJobEdits(prev => ({ ...prev, status: e.target.value }))} style={{ marginRight: 8 }}>
                     <option value="todo">Todo</option>
                     <option value="completed">Completed</option>
@@ -896,6 +1061,7 @@ const AdminDashboard = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div>
                     <strong>{job.name}</strong> - {job.client_name} ({job.status})
+                    
                     <div style={{ fontSize: 11, color: '#666' }}>
                       ⏱️ Timp estimat: <strong>{formatDuration(totalHours)}</strong>
                       {totalHours > 0 && ` → Estimare finalizare: ${formatEstimatedDate(totalHours)}`}
@@ -922,7 +1088,7 @@ const AdminDashboard = () => {
                   {jobTasks.map(task => {
                     const isTaskExpanded = expandedTask === task.id
                     const isTaskEditing = editingTaskId === task.id
-                    const assignedProfile = profiles.find(p => p.id === task.assigned_to)
+                    const assignedProfiles = (profiles || []).filter(p => Array.isArray(task.assigned_to) ? task.assigned_to.includes(p.id) : task.assigned_to === p.id)
 
                     return (
                       <div key={task.id} style={{ marginBottom: 8, padding: 8, border: '1px solid #ddd', borderRadius: 4, backgroundColor: task.status === 'completed' ? '#e8f5e9' : 'white' }}>
@@ -956,12 +1122,9 @@ const AdminDashboard = () => {
                               <option value="todo">Todo</option>
                               <option value="completed">Completed</option>
                             </select>
-                            <select value={taskEdits.assigned_to || ''} onChange={e => setTaskEdits(prev => ({ ...prev, assigned_to: e.target.value }))} style={{ marginRight: 8 }}>
-                              <option value="">Neasignat</option>
-                              {profiles.map(p => (
-                                <option key={p.id} value={p.id}>{displayUserLabel(p)}</option>
-                              ))}
-                            </select>
+                            <div style={{ marginRight: 8 }}>
+                              <MultiAssignSelector profiles={profiles} selectedIds={taskEdits.assigned_to || []} onChange={v => setTaskEdits(prev => ({ ...prev, assigned_to: v }))} />
+                            </div>
                             <button onClick={() => saveTask(task.id)} style={{ fontSize: 11, marginRight: 4 }}>💾 Salvează</button>
                             <button onClick={cancelEditTask} style={{ fontSize: 11 }}>❌ Anulează</button>
                           </div>
@@ -971,7 +1134,7 @@ const AdminDashboard = () => {
                               <div>
                                 <strong>{task.name}</strong> ({task.status})
                                 <div style={{ fontSize: 11, color: '#666' }}>
-                                  Asignat: {displayUserLabel(assignedProfile)}
+                                  Asignat: {assignedProfiles.length > 0 ? assignedProfiles.map(p => displayUserLabel(p)).join(', ') : '(Neasignat)'}
                                   {task.estimated_hours && (
                                     <span> | ⏱️ {formatDuration(task.estimated_hours)} → {formatEstimatedDate(task.estimated_hours)}</span>
                                   )}
@@ -1012,24 +1175,17 @@ const AdminDashboard = () => {
                         required
                         style={{ marginBottom: 4, width: '100%' }}
                       />
-                      <div style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'center' }}>
-                        <label style={{ fontSize: 12 }}>Ore:</label>
-                        <input
-                          type="number"
-                          placeholder="Ore estimate"
-                          value={newTaskData.estimated_hours}
-                          onChange={e => setNewTaskData(prev => ({ ...prev, estimated_hours: e.target.value }))}
-                          style={{ width: 100 }}
-                          step="0.5"
-                          min="0"
-                        />
+                      <textarea placeholder="Descriere" value={newTaskData.description || ''} onChange={e => setNewTaskData(prev => ({ ...prev, description: e.target.value }))} style={{ marginBottom: 8, width: '100%', minHeight: 80, padding: 8 }} />
+                      <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <label style={{ fontSize: 12 }}>Ore:</label>
+                          <input type="number" placeholder="Ore estimate" value={newTaskData.estimated_hours} onChange={e => setNewTaskData(prev => ({ ...prev, estimated_hours: e.target.value }))} style={{ width: 100, padding: 6 }} step="0.5" min="0" />
+                        </div>
+                        {/* Admin cannot set task value here */}
+                        <div>
+                              <MultiAssignSelector profiles={profiles} selectedIds={newTaskData.assigned_to || []} onChange={v => setNewTaskData(prev => ({ ...prev, assigned_to: v }))} />
+                        </div>
                       </div>
-                      <select value={newTaskData.assigned_to} onChange={e => setNewTaskData(prev => ({ ...prev, assigned_to: e.target.value }))} style={{ marginRight: 8 }}>
-                        <option value="">Neasignat</option>
-                        {profiles.map(p => (
-                          <option key={p.id} value={p.id}>{displayUserLabel(p)}</option>
-                        ))}
-                      </select>
                       <button type="submit" style={{ fontSize: 11, marginRight: 4 }}>➕ Adaugă</button>
                       <button type="button" onClick={cancelAddTask} style={{ fontSize: 11 }}>Anulează</button>
                     </form>

@@ -78,12 +78,22 @@ const EmployeeDashboard = () => {
       console.log('📋 All Tasks:', tasksRes.data)
       console.log('🔍 Tasks assigned_to_email values:', tasksRes.data?.map(t => ({ id: t.id, name: t.name, assigned_to_email: t.assigned_to_email })))
 
-      // FILTRARE PENTRU EMPLOYEE: 
+      const profilesData = profilesRes.data || []
+
+      // Normalize tasks: support both array columns and legacy scalar columns
+      const allTasks = (tasksRes.data || []).map(t => {
+        const assigned = Array.isArray(t.assigned_to) ? t.assigned_to : (t.assigned_to ? [t.assigned_to] : [])
+        const assignedEmails = Array.isArray(t.assigned_to_emails)
+          ? t.assigned_to_emails
+          : (t.assigned_to_email ? [t.assigned_to_email] : assigned.map(pid => (profilesData.find(p => p.id === pid) || {}).email).filter(Boolean))
+        return { ...t, assigned_to: assigned, assigned_to_emails: assignedEmails }
+      })
+
+      // FILTRARE PENTRU EMPLOYEE:
       // 1. Găsește joburile unde are taskuri asignate SAU taskuri neasignate
-      const allTasks = tasksRes.data || []
       const myRelevantJobIds = [...new Set(
         allTasks
-          .filter(t => t.assigned_to_email === userProfile.email || t.assigned_to_email === null)
+          .filter(t => (t.assigned_to_emails && t.assigned_to_emails.includes(userProfile.email)) || (t.assigned_to_emails && t.assigned_to_emails.length === 0))
           .map(t => t.job_id)
       )]
       
@@ -107,7 +117,7 @@ const EmployeeDashboard = () => {
 
       setJobs(myJobs)
       setTasks(myJobTasks)
-      setProfiles(profilesRes.data || [])
+      setProfiles(profilesData || [])
     } catch (err) {
       console.error(err)
       setError(err.message || 'Eroare la încărcare date')
@@ -163,7 +173,8 @@ const EmployeeDashboard = () => {
 
   const toggleComplete = async (task) => {
     // Verifică dacă employee-ul poate completa acest task
-    const canComplete = task.assigned_to_email === userProfile.email || task.assigned_to_email === null
+    const assignedEmails = task.assigned_to_emails || []
+    const canComplete = assignedEmails.length === 0 || assignedEmails.includes(userProfile.email)
     
     if (!canComplete) {
       setMessage('⚠️ Nu poți completa acest task - este asignat altcuiva!')
@@ -245,7 +256,10 @@ const EmployeeDashboard = () => {
     // Afișează TOATE taskurile din joburile relevante (unde are taskuri asignate sau neasignate)
     const myRelevantJobIds = [...new Set(
       tasks
-        .filter(t => t.assigned_to_email === userProfile?.email || t.assigned_to_email === null)
+        .filter(t => {
+          const emails = Array.isArray(t.assigned_to_emails) ? t.assigned_to_emails : (t.assigned_to_email ? [t.assigned_to_email] : [])
+          return emails.includes(userProfile?.email) || emails.length === 0
+        })
         .map(t => t.job_id)
     )]
     
@@ -274,7 +288,10 @@ const EmployeeDashboard = () => {
     // Afișează doar joburile care au taskuri asignate utilizatorului sau neasignate
     const myRelevantJobIds = [...new Set(
       tasks
-        .filter(t => t.assigned_to_email === userProfile?.email || t.assigned_to_email === null)
+        .filter(t => {
+          const emails = Array.isArray(t.assigned_to_emails) ? t.assigned_to_emails : (t.assigned_to_email ? [t.assigned_to_email] : [])
+          return emails.includes(userProfile?.email) || emails.length === 0
+        })
         .map(t => t.job_id)
     )]
     
@@ -492,7 +509,7 @@ const EmployeeDashboard = () => {
             console.log(`📊 Job "${job.name}" (${job.id}):`)
             console.log('  - Tasks in state:', tasks.length)
             console.log('  - Tasks for this job:', jobTasks.length)
-            console.log('  - Task details:', jobTasks.map(t => ({ name: t.name, job_id: t.job_id, assigned: t.assigned_to_email })))
+            console.log('  - Task details:', jobTasks.map(t => ({ name: t.name, job_id: t.job_id, assigned: t.assigned_to_emails })))
             
             const totalHours = jobTasks.reduce((sum, t) => sum + (parseFloat(t.estimated_hours) || 0), 0)
             const isExpanded = expandedJob === job.id
@@ -501,7 +518,9 @@ const EmployeeDashboard = () => {
               <div key={job.id} style={{ marginBottom: 16, padding: 12, border: '1px solid #ccc', borderRadius: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div>
-                    <strong>📁 {job.name}</strong> - {job.client_name} ({job.status})
+                        <strong>📁 {job.name}</strong> - {job.client_name} ({job.status})
+                        
+                        <div style={{ fontSize: 12, color: '#333' }}>💰 Valoare job: {job.total_value != null ? parseFloat(job.total_value).toFixed(2) + ' lei' : 'N/A'}</div>
                     <div style={{ fontSize: 11, color: '#666' }}>
                       ⏱️ Timp estimat: <strong>{formatDuration(totalHours)}</strong>
                       {totalHours > 0 && ` → Estimare finalizare: ${formatEstimatedDate(totalHours)}`}
@@ -528,8 +547,10 @@ const EmployeeDashboard = () => {
                     ) : (
                       jobTasks.map(task => {
                       const isTaskExpanded = expandedTask === task.id
-                      const assignedProfile = profiles.find(p => p.id === task.assigned_to)
-                      const canCompleteTask = task.assigned_to_email === userProfile?.email || task.assigned_to_email === null
+                      const assignedProfiles = (profiles || []).filter(p => Array.isArray(task.assigned_to) ? task.assigned_to.includes(p.id) : task.assigned_to === p.id)
+                      const assignedLabels = assignedProfiles.length > 0 ? assignedProfiles.map(p => (p.full_name ? `${p.full_name} (${p.email})` : p.email)).join(', ') : '(Neasignat)'
+                      const assignedEmails = task.assigned_to_emails || []
+                      const canCompleteTask = assignedEmails.length === 0 || assignedEmails.includes(userProfile?.email)
 
                       return (
                         <div key={task.id} style={{ marginBottom: 8, padding: 8, border: '1px solid #ddd', borderRadius: 4, backgroundColor: task.status === 'completed' ? '#e8f5e9' : 'white' }}>
@@ -537,7 +558,7 @@ const EmployeeDashboard = () => {
                             <div style={{ flex: 1 }}>
                               <div style={{ fontWeight: 'bold', fontSize: 13 }}>{task.name}</div>
                               <div style={{ fontSize: 11, color: '#666' }}>
-                                Status: <strong>{task.status}</strong> | Asignat: {displayUserLabel(assignedProfile)}
+                                Status: <strong>{task.status}</strong> | Asignat: {assignedLabels}
                                 {task.estimated_hours && (
                                   <span> | ⏱️ {formatDuration(task.estimated_hours)} → {formatEstimatedDate(task.estimated_hours)}</span>
                                 )}
