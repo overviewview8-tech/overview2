@@ -485,27 +485,34 @@ const AdminDashboard = () => {
       if (newStatus === 'completed') {
         const job = jobs.find(j => j.id === task.job_id)
         // use the updatedTasks array to determine completion state
-        if (job && job.client_email) {
+          if (job && job.client_email) {
           const allCompleted = areAllTasksCompleted(updatedTasks, task.job_id)
           if (allCompleted) {
             const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
             const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
             const completedAt = new Date().toISOString()
-            sendJobCompletionEmail({
-              to: job.client_email,
-              clientName: job.client_name,
-              jobName: job.name,
-              tasks: jobTasks,
-              totalValue,
-              completedAt,
-              clientFirstName: job.client_first_name,
-              clientLastName: job.client_last_name,
-              clientCNP: job.client_cnp,
-              clientSeries: job.client_id_series,
-              clientAddress: job.client_address
-            }).then(res => {
-              if (res && !res.ok) console.warn('⚠️ Job email failed', res)
-            }).catch(err => console.error('Job email error', err))
+            try {
+              const { data: updatedJobArr, error: jobUpdErr } = await supabase.from('jobs').update({ status: 'completed', completed_at: completedAt }).eq('id', job.id).select()
+              if (jobUpdErr) throw jobUpdErr
+              const updatedJob = (updatedJobArr && updatedJobArr[0]) ? updatedJobArr[0] : job
+              const receptionNumber = updatedJob.reception_number || updatedJob.receptionNumber || null
+              await sendJobCompletionEmail({
+                to: job.client_email,
+                clientName: job.client_name,
+                jobName: job.name,
+                tasks: jobTasks,
+                totalValue,
+                completedAt,
+                clientFirstName: job.client_first_name,
+                clientLastName: job.client_last_name,
+                clientCNP: job.client_cnp,
+                clientSeries: job.client_id_series,
+                clientAddress: job.client_address,
+                receptionNumber
+              })
+            } catch (err) {
+              console.error('Failed to update job or send email', err)
+            }
           }
         }
       }
