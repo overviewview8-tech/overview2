@@ -195,7 +195,7 @@ const AdminDashboard = () => {
         client_address: clientAddress || null,
         client_email: clientemail || null,
         status: 'todo',
-        creator_id: user.id,
+        created_by: user.id,
         total_value: 0
       }]).select()
       if (jobErr) throw jobErr
@@ -213,7 +213,7 @@ const AdminDashboard = () => {
         assigned_to_emails: null,
         estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
         value: null,
-        creator_id: user.id
+        created_by: user.id
       }))
 
       // Safe insert: try inserting as-is (with arrays). If the DB still
@@ -537,7 +537,7 @@ const AdminDashboard = () => {
         assigned_to_emails: null,
         estimated_hours: newTaskData.estimated_hours ? parseFloat(newTaskData.estimated_hours) : null,
         value: null,
-        creator_id: user.id
+        created_by: user.id
       }
       // Insert with same safe-retry logic as bulk insert
       try {

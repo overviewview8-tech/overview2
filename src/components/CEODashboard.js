@@ -198,7 +198,7 @@ export default function CEODashboard() {
         client_address: clientAddress || null,
         client_email: clientemail || null,
         status: 'todo',
-        creator_id: user?.id || null,
+        created_by: user?.id || null,
         total_value: jobValue ? parseFloat(jobValue) : 0
       }]).select()
       if (jobErr) throw jobErr
@@ -215,7 +215,7 @@ export default function CEODashboard() {
           assigned_to_emails: null,
           estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
           value: t.value ? parseFloat(t.value) : null,
-          creator_id: user?.id || null
+          created_by: user?.id || null
         }))
 
       if (tasksToInsert.length > 0) {
@@ -526,7 +526,7 @@ export default function CEODashboard() {
         assigned_to_emails: null,
         estimated_hours: newTaskData.estimated_hours ? parseFloat(newTaskData.estimated_hours) : null,
         value: newTaskData.value ? parseFloat(newTaskData.value) : null,
-        creator_id: user?.id || null
+        created_by: user?.id || null
       }
       const { error: addErr } = await supabase.from('tasks').insert([taskToInsert])
       if (addErr) throw addErr
