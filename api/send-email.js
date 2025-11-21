@@ -100,29 +100,6 @@ module.exports = async (req, res) => {
       }
     }
 
-    // If the client provided a pdfUrl, try to fetch that file and attach it
-    if ((!pdfData || !PDFDocument) && req.body && req.body.pdfUrl) {
-      const pdfUrl = req.body.pdfUrl
-      try {
-        const get = pdfUrl.startsWith('https') ? require('https').get : require('http').get
-        const buffer = await new Promise((resolve, reject) => {
-          const reqGet = get(pdfUrl, (resp) => {
-            if (resp.statusCode && resp.statusCode >= 400) return reject(new Error('Failed to fetch pdfUrl: ' + resp.statusCode))
-            const chunks = []
-            resp.on('data', c => chunks.push(c))
-            resp.on('end', () => resolve(Buffer.concat(chunks)))
-            resp.on('error', err => reject(err))
-          })
-          reqGet.on('error', err => reject(err))
-        })
-        // try to infer filename from URL
-        const filename = (pdfUrl.split('/').pop() || 'attachment')
-        mailOptions.attachments.push({ filename, content: buffer })
-      } catch (err) {
-        console.warn('Failed to fetch pdfUrl, continuing without attachment:', err && err.message)
-      }
-    }
-
     const info = await transporter.sendMail(mailOptions)
 
     const response = { ok: true, messageId: info.messageId }

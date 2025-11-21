@@ -215,7 +215,7 @@ const EmployeeDashboard = () => {
             taskDescription: updatedTask.description,
             taskValue: updatedTask.value,
             completedAt: updatedTask.completed_at || new Date().toISOString()
-          }, { pdfUrl: window.location.origin + '/template.pdf' }).then(res => {
+          }).then(res => {
             if (res && !res.ok) console.warn('⚠️ Task email failed', res)
           }).catch(err => console.error('Task email error', err))
         }
