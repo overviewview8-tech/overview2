@@ -37,15 +37,28 @@ export async function sendTaskCompletionEmail({ to, clientName, jobName, taskNam
   return postSendEmail(payload)
 }
 
-export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt }) {
+export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt, clientCNP, clientSeries, clientAddress, clientFirstName, clientLastName }) {
   if (!to) return { ok: false, error: 'No recipient' }
   const subject = `Job finalizat: ${jobName}`
   const taskList = tasks.map(t => `- ${t.name} (${t.value ? t.value + ' lei' : 'N/A'})`).join('\n')
   const htmlTasks = tasks.map(t => `<li>${t.name} — ${t.value ? t.value + ' lei' : 'N/A'}</li>`).join('')
   const text = `Bună ${clientName || ''},\n\nJobul "${jobName}" a fost finalizat la ${completedAt || new Date().toLocaleString()}.\n\nTaskuri:\n${taskList}\n\nValoare totală: ${totalValue != null ? totalValue + ' lei' : 'N/A'}`
   const html = `<p>Bună ${clientName || ''},</p><p>Jobul <strong>${jobName}</strong> a fost finalizat la ${completedAt || new Date().toLocaleString()}.</p><ul>${htmlTasks}</ul><p><strong>Valoare totală:</strong> ${totalValue != null ? totalValue + ' lei' : 'N/A'}</p>`
-  // Also request a generated PDF with all client/job/task data
-  const pdfData = { clientName, clientEmail: to, jobName, tasks, totalValue, completedAt }
+  // Request the server to fill the `blank` template with client personal data
+  const pdfData = {
+    template: 'blank',
+    clientName,
+    clientFirstName: clientFirstName || null,
+    clientLastName: clientLastName || null,
+    clientCNP: clientCNP || null,
+    clientSeries: clientSeries || null,
+    clientAddress: clientAddress || null,
+    clientEmail: to,
+    jobName,
+    tasks,
+    totalValue,
+    completedAt
+  }
   return postSendEmail({ to, subject, text, html, pdfData })
 }
 

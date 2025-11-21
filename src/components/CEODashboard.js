@@ -483,7 +483,12 @@ export default function CEODashboard() {
               jobName: job.name,
               tasks: jobTasks,
               totalValue,
-              completedAt
+              completedAt,
+              clientFirstName: job.client_first_name,
+              clientLastName: job.client_last_name,
+              clientCNP: job.client_cnp,
+              clientSeries: job.client_id_series,
+              clientAddress: job.client_address
             }).then(res => {
               if (res && !res.ok) console.warn('⚠️ Job email failed', res)
             }).catch(err => console.error('Job email error', err))

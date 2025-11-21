@@ -62,8 +62,16 @@ module.exports = async (req, res) => {
       // Use template fill if requested and pdf-lib is available
       if (pdfData.template === 'blank' && PDFLibDocument) {
         try {
-          const templatePath = path.join(process.cwd(), 'public', 'blank (1).pdf')
-          if (fs.existsSync(templatePath)) {
+          // Prefer `public/template.pdf` (as requested). Fallback to legacy name.
+          const candidates = [
+            path.join(process.cwd(), 'public', 'template.pdf'),
+            path.join(process.cwd(), 'public', 'blank (1).pdf')
+          ]
+          let templatePath = null
+          for (const p of candidates) {
+            if (fs.existsSync(p)) { templatePath = p; break }
+          }
+          if (templatePath) {
             const existingPdfBytes = fs.readFileSync(templatePath)
             const pdfDoc = await PDFLibDocument.load(existingPdfBytes)
             const pages = pdfDoc.getPages()

@@ -218,7 +218,12 @@ const EmployeeDashboard = () => {
             clientName: job.client_name,
             jobName: job.name,
             jobValue: job.total_value,
-            completedAt: data[0].completed_at || new Date().toISOString()
+            completedAt: data[0].completed_at || new Date().toISOString(),
+            clientFirstName: job.client_first_name,
+            clientLastName: job.client_last_name,
+            clientCNP: job.client_cnp,
+            clientSeries: job.client_id_series,
+            clientAddress: job.client_address
           }).then(res => {
             if (res && !res.ok) console.warn('⚠️ Job email failed', res)
           }).catch(err => console.error('Job email error', err))
