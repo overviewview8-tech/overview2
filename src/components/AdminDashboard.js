@@ -481,27 +481,28 @@ const AdminDashboard = () => {
       const updatedTasks = tasks.map(t => t.id === task.id ? data[0] : t)
       setTasks(updatedTasks)
       
-      // Dacă e completat, trimite email single-task către client (dacă există)
+      // Dacă e completat, trimite email pentru JOB doar când toate taskurile sunt finalizate
       if (newStatus === 'completed') {
         const job = jobs.find(j => j.id === task.job_id)
+        // use the updatedTasks array to determine completion state
         if (job && job.client_email) {
-          const updatedTask = updatedTasks.find(t => t.id === task.id) || task
-          sendTaskCompletionEmail({
-            to: job.client_email,
-            clientName: job.client_name,
-            jobName: job.name,
-            taskName: updatedTask.name,
-            taskDescription: updatedTask.description,
-            taskValue: updatedTask.value,
-            completedAt: updatedTask.completed_at || new Date().toISOString()
-          }).then(res => {
-            if (res && !res.ok) console.warn('⚠️ Task email failed', res)
-          }).catch(err => console.error('Task email error', err))
+          const allCompleted = areAllTasksCompleted(updatedTasks, task.job_id)
+          if (allCompleted) {
+            const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
+            const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
+            const completedAt = new Date().toISOString()
+            sendJobCompletionEmail({
+              to: job.client_email,
+              clientName: job.client_name,
+              jobName: job.name,
+              tasks: jobTasks,
+              totalValue,
+              completedAt
+            }).then(res => {
+              if (res && !res.ok) console.warn('⚠️ Job email failed', res)
+            }).catch(err => console.error('Job email error', err))
+          }
         }
-
-        // NOTE: Only single-task completion email is sent. Sending a
-        // job-completion email as well produced duplicate notifications
-        // for clients — keep it simple and send only the per-task email.
       }
     } catch (err) {
       console.error(err)

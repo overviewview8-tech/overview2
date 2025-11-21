@@ -469,28 +469,26 @@ export default function CEODashboard() {
       setTasks(updatedTasks)
 
       if (newStatus === 'completed') {
-        // send single-task completion email to client (if present)
+        // send job-completion email only when all tasks for the job are completed
         const job = jobs.find(j => j.id === task.job_id)
         if (job && job.client_email) {
-          const updatedTask = updatedTasks.find(t => t.id === task.id) || task
-          sendTaskCompletionEmail({
-            to: job.client_email,
-            clientName: job.client_name,
-            jobName: job.name,
-            taskName: updatedTask.name,
-            taskDescription: updatedTask.description,
-            taskValue: updatedTask.value,
-            completedAt: updatedTask.completed_at || new Date().toISOString()
-          }).then(res => {
-            if (res && !res.ok) console.warn('⚠️ Task email failed', res)
-          }).catch(err => console.error('Task email error', err))
+          const allCompleted = areAllTasksCompleted(updatedTasks, task.job_id)
+          if (allCompleted) {
+            const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
+            const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
+            const completedAt = new Date().toISOString()
+            sendJobCompletionEmail({
+              to: job.client_email,
+              clientName: job.client_name,
+              jobName: job.name,
+              tasks: jobTasks,
+              totalValue,
+              completedAt
+            }).then(res => {
+              if (res && !res.ok) console.warn('⚠️ Job email failed', res)
+            }).catch(err => console.error('Job email error', err))
+          }
         }
-
-        // NOTE: only sending the simple single-task completion email.
-        // Previous behavior also sent a job-completion email when all
-        // tasks were completed — that caused duplicate messages for
-        // clients. We intentionally do not send the job-completion
-        // email from the client UI to keep notifications simple.
       }
     } catch (err) {
       console.error(err)

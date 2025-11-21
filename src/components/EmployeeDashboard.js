@@ -202,34 +202,32 @@ const EmployeeDashboard = () => {
       // Actualizează lista de task-uri
       const updatedTasks = tasks.map(t => t.id === task.id ? data[0] : t)
       setTasks(updatedTasks)
-      
-        // Trimite email single-task către client (dacă există)
-        const job = jobs.find(j => j.id === task.job_id)
+
+      // Decidează trimiterea email-ului: trimitem doar când toate taskurile
+      // din job sunt completate (cerința: mailul se trimite numai la
+      // finalizarea jobului, nu la fiecare task).
+      const job = jobs.find(j => j.id === task.job_id)
+      const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
+      const remainingTasks = jobTasks.filter(t => t.status !== 'completed').length
+
+      if (remainingTasks === 0) {
+        // Toate taskurile sunt completate — trimitem emailul de job
         if (job && job.client_email) {
-          const updatedTask = updatedTasks.find(t => t.id === task.id) || task
-          sendTaskCompletionEmail({
+          sendJobCompletionEmail({
             to: job.client_email,
             clientName: job.client_name,
             jobName: job.name,
-            taskName: updatedTask.name,
-            taskDescription: updatedTask.description,
-            taskValue: updatedTask.value,
-            completedAt: updatedTask.completed_at || new Date().toISOString()
+            jobValue: job.total_value,
+            completedAt: data[0].completed_at || new Date().toISOString()
           }).then(res => {
-            if (res && !res.ok) console.warn('⚠️ Task email failed', res)
-          }).catch(err => console.error('Task email error', err))
+            if (res && !res.ok) console.warn('⚠️ Job email failed', res)
+          }).catch(err => console.error('Job email error', err))
         }
-
-        // We still update the UI message but do NOT send a job-completion
-        // email here — only the simpler single-task completion email is
-        // sent to the client to avoid duplicate notifications.
-        const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
-        const remainingTasks = jobTasks.filter(t => t.status !== 'completed').length
-        if (remainingTasks === 0) {
-          setMessage('✅ Task completat! 🎉 Jobul este finalizat!')
-        } else {
-          setMessage(`✅ Task completat! (Mai sunt ${remainingTasks} task-uri în job)`)
-        }
+        setMessage('✅ Task completat! 🎉 Jobul este finalizat!')
+      } else {
+        // Nu trimitem email la fiecare task — doar actualizăm mesajul UI
+        setMessage(`✅ Task completat! (Mai sunt ${remainingTasks} task-uri în job)`)
+      }
         setTimeout(() => setMessage(null), 4000)
     } catch (err) {
       console.error(err)

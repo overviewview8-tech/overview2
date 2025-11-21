@@ -1,19 +1,25 @@
 const nodemailer = require('nodemailer')
-// PDF generation library
-let PDFDocument
+const fs = require('fs')
+const path = require('path')
+
+// Optional PDF libraries
+let PDFKit = null
+try { PDFKit = require('pdfkit') } catch (e) { PDFKit = null }
+
+let PDFLib = null
+let PDFLibDocument = null
+let pdfLibRgb = null
+let pdfLibStandardFonts = null
 try {
-  PDFDocument = require('pdfkit')
+  PDFLib = require('pdf-lib')
+  PDFLibDocument = PDFLib.PDFDocument
+  pdfLibRgb = PDFLib.rgb
+  pdfLibStandardFonts = PDFLib.StandardFonts
 } catch (e) {
-  // pdfkit might not be installed in some environments; handler will skip PDF generation
-  PDFDocument = null
+  PDFLib = null
 }
 
-// Simple POST /api/send-email handler for Vercel serverless or other Node hosts.
-// Expects JSON body: { to: string, subject: string, text?: string, html?: string }
-// Environment variables required:
-//  - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
-//  - FROM_EMAIL (optional; defaults to SMTP_USER)
-
+// Vercel serverless-compatible handler
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
@@ -23,6 +29,7 @@ module.exports = async (req, res) => {
   try {
     const { to, subject, text, html, pdfData } = req.body || {}
     if (!to || !subject) return res.status(400).json({ error: 'Missing required fields: to, subject' })
+
     const host = process.env.SMTP_HOST
     const port = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587
     const user = process.env.SMTP_USER
@@ -32,17 +39,9 @@ module.exports = async (req, res) => {
 
     let transporter
     let usedEthereal = false
-
-    // If explicitly disabled or missing SMTP creds, fall back to Ethereal test account
     if (disableSmtp || !host || !user || !pass) {
-      console.warn('SMTP not fully configured or DISABLE_SMTP=true — using Ethereal test account for local dev')
       const testAccount = await nodemailer.createTestAccount()
-      transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: { user: testAccount.user, pass: testAccount.pass }
-      })
+      transporter = nodemailer.createTransport({ host: 'smtp.ethereal.email', port: 587, secure: false, auth: { user: testAccount.user, pass: testAccount.pass } })
       usedEthereal = true
     } else {
       const secure = port === 465 || process.env.SMTP_SECURE === 'true'
@@ -58,58 +57,96 @@ module.exports = async (req, res) => {
       attachments: []
     }
 
-    // If pdfData provided and pdfkit available, generate a PDF buffer and attach
-    if (pdfData && PDFDocument) {
-      try {
-        const buffer = await new Promise((resolve, reject) => {
-          const doc = new PDFDocument({ size: 'A4', margin: 50 })
-          const chunks = []
-          doc.on('data', chunk => chunks.push(chunk))
-          doc.on('end', () => resolve(Buffer.concat(chunks)))
-          doc.on('error', err => reject(err))
+    // Generate or fill PDF when requested
+    if (pdfData) {
+      // Use template fill if requested and pdf-lib is available
+      if (pdfData.template === 'blank' && PDFLibDocument) {
+        try {
+          const templatePath = path.join(process.cwd(), 'public', 'blank (1).pdf')
+          if (fs.existsSync(templatePath)) {
+            const existingPdfBytes = fs.readFileSync(templatePath)
+            const pdfDoc = await PDFLibDocument.load(existingPdfBytes)
+            const pages = pdfDoc.getPages()
+            const firstPage = pages[0]
+            const { width, height } = firstPage.getSize()
+            const helvetica = await pdfDoc.embedFont(pdfLibStandardFonts.Helvetica)
 
-          // Simple PDF layout with job & client data
-          doc.fontSize(18).text(pdfData.jobName || 'Job Summary', { align: 'center' })
-          doc.moveDown()
-          doc.fontSize(12).text(`Client: ${pdfData.clientName || ''}`)
-          doc.text(`Client email: ${pdfData.clientEmail || ''}`)
-          if (pdfData.clientFirstName || pdfData.clientLastName) {
-            doc.text(`Client name parts: ${pdfData.clientFirstName || ''} ${pdfData.clientLastName || ''}`)
+            // Default placement — adjust later if needed
+            const marginLeft = 50
+            let currentY = height - 120
+            const lineHeight = 18
+
+            const draw = (label, value) => {
+              if (!value) return
+              firstPage.drawText(`${label}: ${value}`, { x: marginLeft, y: currentY, size: 12, font: helvetica, color: pdfLibRgb(0, 0, 0) })
+              currentY -= lineHeight
+            }
+
+            draw('Nume', pdfData.clientLastName || pdfData.clientName || '')
+            draw('Prenume', pdfData.clientFirstName || '')
+            draw('CNP', pdfData.clientCNP || pdfData.cnp || '')
+            draw('Serie', pdfData.clientSeries || pdfData.serie || '')
+            draw('Adresa', pdfData.clientAddress || pdfData.address || '')
+            draw('Job', pdfData.jobName || '')
+            draw('Finalizat la', pdfData.completedAt || '')
+
+            const modified = await pdfDoc.save()
+            mailOptions.attachments.push({ filename: `${(pdfData.clientLastName || 'client')}_${(pdfData.jobName || 'job')}_filled.pdf`.replace(/[^a-z0-9\-_.]/gi, '_'), content: Buffer.from(modified) })
+          } else {
+            console.warn('Template not found at', templatePath)
           }
-          doc.text(`Completed at: ${pdfData.completedAt || ''}`)
-          doc.moveDown()
-          doc.fontSize(14).text('Tasks:', { underline: true })
-          doc.moveDown(0.5)
-          const tasks = Array.isArray(pdfData.tasks) ? pdfData.tasks : []
-          tasks.forEach((t, i) => {
-            doc.fontSize(12).text(`${i + 1}. ${t.name || '—'}`)
-            if (t.description) doc.text(`   Description: ${t.description}`)
-            if (t.value != null) doc.text(`   Value: ${t.value} lei`)
-            if (t.estimated_hours != null) doc.text(`   Estimated hours: ${t.estimated_hours}`)
-            doc.moveDown(0.5)
+        } catch (err) {
+          console.warn('Template filling failed:', err && err.message)
+        }
+
+      } else if (PDFKit) {
+        // Fallback: generate a simple PDF using pdfkit
+        try {
+          const buffer = await new Promise((resolve, reject) => {
+            const doc = new PDFKit({ size: 'A4', margin: 50 })
+            const chunks = []
+            doc.on('data', c => chunks.push(c))
+            doc.on('end', () => resolve(Buffer.concat(chunks)))
+            doc.on('error', err => reject(err))
+
+            doc.fontSize(18).text(pdfData.jobName || 'Job Summary', { align: 'center' })
+            doc.moveDown()
+            doc.fontSize(12).text(`Client: ${pdfData.clientName || ''}`)
+            doc.text(`Client email: ${pdfData.clientEmail || ''}`)
+            if (pdfData.clientFirstName || pdfData.clientLastName) doc.text(`Client name parts: ${pdfData.clientFirstName || ''} ${pdfData.clientLastName || ''}`)
+            if (pdfData.clientCNP) doc.text(`CNP: ${pdfData.clientCNP}`)
+            if (pdfData.clientSeries) doc.text(`Serie: ${pdfData.clientSeries}`)
+            if (pdfData.clientAddress) doc.text(`Adresa: ${pdfData.clientAddress}`)
+            doc.text(`Completed at: ${pdfData.completedAt || ''}`)
+            doc.moveDown()
+            doc.fontSize(14).text('Tasks:', { underline: true })
+            const tasks = Array.isArray(pdfData.tasks) ? pdfData.tasks : []
+            tasks.forEach((t, i) => {
+              doc.fontSize(12).text(`${i + 1}. ${t.name || '—'}`)
+              if (t.description) doc.text(`   Description: ${t.description}`)
+              if (t.value != null) doc.text(`   Value: ${t.value} lei`)
+              if (t.estimated_hours != null) doc.text(`   Estimated hours: ${t.estimated_hours}`)
+              doc.moveDown(0.5)
+            })
+            doc.moveDown()
+            doc.fontSize(12).text(`Total value: ${pdfData.totalValue != null ? pdfData.totalValue + ' lei' : 'N/A'}`)
+
+            doc.end()
           })
-          doc.moveDown()
-          doc.fontSize(12).text(`Total value: ${pdfData.totalValue != null ? pdfData.totalValue + ' lei' : 'N/A'}`)
-
-          doc.end()
-        })
-
-        mailOptions.attachments.push({ filename: `${(pdfData.jobName || 'job').replace(/[^a-z0-9\-]/gi, '_')}_summary.pdf`, content: buffer })
-      } catch (err) {
-        console.warn('PDF generation failed, sending email without PDF:', err && err.message)
+          mailOptions.attachments.push({ filename: `${(pdfData.jobName || 'job').replace(/[^a-z0-9\-]/gi, '_')}_summary.pdf`, content: buffer })
+        } catch (err) {
+          console.warn('PDF generation failed:', err && err.message)
+        }
       }
     }
 
     const info = await transporter.sendMail(mailOptions)
-
     const response = { ok: true, messageId: info.messageId }
-    if (usedEthereal) {
-      response.preview = nodemailer.getTestMessageUrl(info) || null
-    }
-
+    if (usedEthereal) response.preview = nodemailer.getTestMessageUrl(info) || null
     return res.status(200).json(response)
   } catch (err) {
     console.error('send-email error', err)
     return res.status(500).json({ error: err.message || 'Failed to send email' })
   }
 }
+
