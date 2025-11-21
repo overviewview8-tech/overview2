@@ -95,8 +95,6 @@ module.exports = async (req, res) => {
             draw('CNP', pdfData.clientCNP || pdfData.cnp || '')
             draw('Serie', pdfData.clientSeries || pdfData.serie || '')
             draw('Adresa', pdfData.clientAddress || pdfData.address || '')
-            // Reception number (assigned by DB trigger)
-            draw('Numar receptie', (pdfData.receptionNumber != null ? String(pdfData.receptionNumber) : (pdfData.reception_number != null ? String(pdfData.reception_number) : '')))
             draw('Job', pdfData.jobName || '')
             draw('Finalizat la', pdfData.completedAt || '')
 

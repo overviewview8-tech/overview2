@@ -213,28 +213,20 @@ const EmployeeDashboard = () => {
       if (remainingTasks === 0) {
         // Toate taskurile sunt completate — trimitem emailul de job
         if (job && job.client_email) {
-          const completedAt = data[0].completed_at || new Date().toISOString()
-          try {
-            const { data: updatedJobArr, error: jobUpdErr } = await supabase.from('jobs').update({ status: 'completed', completed_at: completedAt }).eq('id', job.id).select()
-            if (jobUpdErr) throw jobUpdErr
-            const updatedJob = (updatedJobArr && updatedJobArr[0]) ? updatedJobArr[0] : job
-            const receptionNumber = updatedJob.reception_number || updatedJob.receptionNumber || null
-            await sendJobCompletionEmail({
-              to: job.client_email,
-              clientName: job.client_name,
-              jobName: job.name,
-              jobValue: job.total_value,
-              completedAt: completedAt,
-              clientFirstName: job.client_first_name,
-              clientLastName: job.client_last_name,
-              clientCNP: job.client_cnp,
-              clientSeries: job.client_id_series,
-              clientAddress: job.client_address,
-              receptionNumber
-            })
-          } catch (err) {
-            console.error('Failed to update job or send email', err)
-          }
+          sendJobCompletionEmail({
+            to: job.client_email,
+            clientName: job.client_name,
+            jobName: job.name,
+            jobValue: job.total_value,
+            completedAt: data[0].completed_at || new Date().toISOString(),
+            clientFirstName: job.client_first_name,
+            clientLastName: job.client_last_name,
+            clientCNP: job.client_cnp,
+            clientSeries: job.client_id_series,
+            clientAddress: job.client_address
+          }).then(res => {
+            if (res && !res.ok) console.warn('⚠️ Job email failed', res)
+          }).catch(err => console.error('Job email error', err))
         }
         setMessage('✅ Task completat! 🎉 Jobul este finalizat!')
       } else {

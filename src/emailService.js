@@ -37,7 +37,7 @@ export async function sendTaskCompletionEmail({ to, clientName, jobName, taskNam
   return postSendEmail(payload)
 }
 
-export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt, clientCNP, clientSeries, clientAddress, clientFirstName, clientLastName, receptionNumber }) {
+export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt, clientCNP, clientSeries, clientAddress, clientFirstName, clientLastName }) {
   if (!to) return { ok: false, error: 'No recipient' }
   const subject = `Job finalizat: ${jobName}`
   const taskList = tasks.map(t => `- ${t.name} (${t.value ? t.value + ' lei' : 'N/A'})`).join('\n')
@@ -53,7 +53,6 @@ export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = 
     clientCNP: clientCNP || null,
     clientSeries: clientSeries || null,
     clientAddress: clientAddress || null,
-    receptionNumber: receptionNumber != null ? receptionNumber : null,
     clientEmail: to,
     jobName,
     tasks,
