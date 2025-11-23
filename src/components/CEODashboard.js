@@ -99,6 +99,49 @@ export default function CEODashboard() {
     }
   }
 
+  const downloadPdfForJob = async (job) => {
+    try {
+      const jobTasks = tasks.filter(t => t.job_id === job.id)
+      const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
+      const pdfData = {
+        template: 'blank',
+        clientName: job.client_name,
+        clientFirstName: job.client_first_name || null,
+        clientLastName: job.client_last_name || null,
+        clientCNP: job.client_cnp || null,
+        clientSeries: job.client_id_series || null,
+        clientAddress: job.client_address || null,
+        clientEmail: job.client_email || null,
+        jobName: job.name,
+        tasks: jobTasks,
+        totalValue,
+        completedAt: job.completed_at || new Date().toISOString(),
+        receptionNumber: job.reception_number || job.receptionNumber || null
+      }
+
+      const res = await fetch('/api/generate-pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdfData }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error('Generate PDF failed', err)
+        setError(err.error || 'Eroare generare PDF')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const filenameBase = `${(job.client_name || 'client').replace(/[^a-z0-9\-_\. ]/gi, '_')}_${(job.name || 'job').replace(/[^a-z0-9\-_\. ]/gi, '_')}`
+      a.href = url
+      a.download = `${filenameBase}_filled.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('downloadPdfForJob error', err)
+      setError(err.message || 'Eroare la descarcare PDF')
+    }
+  }
+
   const fetchProfiles = async () => {
     setLoading(true)
     try {
@@ -980,7 +1023,10 @@ export default function CEODashboard() {
                           <div style={{ display: 'flex', gap: 8 }}>
                             <button onClick={() => startEditProfile(profile)} style={{ fontSize: 12, backgroundColor: '#2196F3', color: 'white' }}>✏️ Editează</button>
                             {profile.email !== 'overviewview8@gmail.com' && (
-                              <>
+                            {job.status === 'completed' && (
+                              <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
+                            )}
+                            <button onClick={() => deleteJob(job.id)} style={{ fontSize: 12, color: 'red' }}>🗑️</button>
                                 <button
                                   onClick={() => setProfileRole(profile.id, profile.role === 'admin' ? 'employee' : 'admin')}
                                   style={{ fontSize: 12, backgroundColor: profile.role === 'admin' ? '#FFA000' : '#4CAF50', color: 'white' }}
