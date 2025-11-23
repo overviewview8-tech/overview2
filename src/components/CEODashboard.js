@@ -1023,10 +1023,7 @@ export default function CEODashboard() {
                           <div style={{ display: 'flex', gap: 8 }}>
                             <button onClick={() => startEditProfile(profile)} style={{ fontSize: 12, backgroundColor: '#2196F3', color: 'white' }}>✏️ Editează</button>
                             {profile.email !== 'overviewview8@gmail.com' && (
-                            {job.status === 'completed' && (
-                              <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
-                            )}
-                            <button onClick={() => deleteJob(job.id)} style={{ fontSize: 12, color: 'red' }}>🗑️</button>
+                              <>
                                 <button
                                   onClick={() => setProfileRole(profile.id, profile.role === 'admin' ? 'employee' : 'admin')}
                                   style={{ fontSize: 12, backgroundColor: profile.role === 'admin' ? '#FFA000' : '#4CAF50', color: 'white' }}
@@ -1038,6 +1035,7 @@ export default function CEODashboard() {
                                 <button onClick={() => deleteProfile(profile.id)} style={{ fontSize: 12, backgroundColor: '#f44336', color: 'white' }}>🗑️ Șterge</button>
                               </>
                             )}
+                          </div>
                           </div>
                         </div>
                       )}
