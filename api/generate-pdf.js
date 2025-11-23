@@ -48,21 +48,116 @@ module.exports = async (req, res) => {
 
       const marginLeft = 50
       let currentY = height - 120
-      const lineHeight = 18
-      const draw = (label, value) => {
-        if (!value) return
-        firstPage.drawText(`${label}: ${value}`, { x: marginLeft, y: currentY, size: 12, font: helvetica, color: pdfLibRgb(0, 0, 0) })
-        currentY -= lineHeight
+        // global/default font size (can be overridden per-field via pdfData.fieldBoxes[...].size)
+        const defaultFontSize = (pdfData && pdfData.fontSize) ? Number(pdfData.fontSize) : 12
+        const lineHeight = Math.max(12, Math.round(defaultFontSize * 1.6))
+
+      // draw simple single-line label + value
+      const draw = (label, value, opts = {}) => {
+        if (value === undefined || value === null || value === '') return
+        const size = (opts.size != null) ? opts.size : defaultFontSize
+        const x = (opts.x != null) ? opts.x : marginLeft
+        const y = (opts.y != null) ? opts.y : currentY
+        firstPage.drawText(`${label ? label + ' ' : ''}${value}`, { x, y, size, font: helvetica, color: pdfLibRgb(0, 0, 0) })
+        if (opts.y == null) currentY -= lineHeight
       }
 
-      draw('Nume', pdfData.clientLastName || pdfData.clientName || '')
-      draw('Prenume', pdfData.clientFirstName || '')
-      draw('CNP', pdfData.clientCNP || pdfData.cnp || '')
-      draw('Serie', pdfData.clientSeries || pdfData.serie || '')
-      draw('Adresa', pdfData.clientAddress || pdfData.address || '')
-      draw('Job', pdfData.jobName || '')
-      draw('Finalizat la', pdfData.completedAt || '')
-      if (pdfData.receptionNumber) draw('Numar receptie', String(pdfData.receptionNumber))
+      // draw label and wrap value into multiple lines respecting maxWidth and maxHeight
+      const drawWrapped = (label, value, opts = {}) => {
+        if (value === undefined || value === null || value === '') {
+          if (!opts || opts.y == null) currentY -= lineHeight
+          return
+        }
+        const size = (opts.size != null) ? opts.size : defaultFontSize
+        const x = (opts.x != null) ? opts.x : marginLeft
+        // prefer explicit width/height if provided
+        const availWidthTotal = (opts.width != null) ? opts.width : (opts.maxWidth != null ? opts.maxWidth : (width - marginLeft - 50))
+        const maxHeight = (opts.height != null) ? opts.height : (opts.maxHeight != null ? opts.maxHeight : (lineHeight * 4)) // default allow up to 4 lines
+
+        const labelText = label ? `${label} ` : ''
+        const y = (opts.y != null) ? opts.y : currentY
+        const labelWidth = helvetica.widthOfTextAtSize(labelText, size)
+        if (labelText) firstPage.drawText(labelText, { x, y, size, font: helvetica, color: pdfLibRgb(0, 0, 0) })
+
+        const availWidth = Math.max(20, availWidthTotal - labelWidth)
+        const words = String(value).split(/\s+/)
+        const lines = []
+        let line = ''
+        for (const w of words) {
+          const test = line ? `${line} ${w}` : w
+          const wWidth = helvetica.widthOfTextAtSize(test, size)
+          if (wWidth <= availWidth) {
+            line = test
+          } else {
+            if (line) lines.push(line)
+            line = w
+          }
+        }
+        if (line) lines.push(line)
+
+        const maxLines = Math.max(1, Math.floor(maxHeight / lineHeight))
+        let renderedLines = lines.slice(0, maxLines)
+        if (lines.length > maxLines) {
+          // truncate last line and add ellipsis
+          let last = renderedLines[renderedLines.length - 1]
+          while (helvetica.widthOfTextAtSize(`${last}...`, size) > availWidth && last.length > 0) {
+            last = last.slice(0, -1)
+          }
+          renderedLines[renderedLines.length - 1] = `${last}...`
+        }
+
+        const startX = x + labelWidth
+        for (let i = 0; i < renderedLines.length; i++) {
+          firstPage.drawText(renderedLines[i], { x: startX, y: y - i * lineHeight, size, font: helvetica, color: pdfLibRgb(0, 0, 0) })
+        }
+        if (opts.y == null) currentY -= Math.max(lineHeight, renderedLines.length * lineHeight)
+      }
+
+        // drawField chooses wrapped or simple rendering based on pdfData.fieldBoxes
+        const drawField = (fieldKey, label, value) => {
+          const boxes = pdfData && pdfData.fieldBoxes
+          const boxOpts = boxes && (boxes[fieldKey] || boxes[label])
+          const merged = Object.assign({}, boxOpts || {})
+          // global no-label flag
+          if (pdfData && pdfData.noLabels) merged.noLabel = true
+
+          // special split for series (first 2 chars and last 6 chars)
+          if (fieldKey === 'clientSeries' && value) {
+            const s = String(value)
+            const firstPart = s.slice(0, 2)
+            const restPart = s.length > 2 ? s.slice(-6) : ''
+            // compute positions: allow explicit part1X/part1Y and part2X/part2Y
+            const part1X = (merged.part1X != null) ? merged.part1X : ((merged.x != null) ? merged.x : marginLeft + 520 - marginLeft)
+            const part1Y = (merged.part1Y != null) ? merged.part1Y : ((merged.y != null) ? merged.y : currentY)
+            const baseForOffset = part1X
+            const part2X = merged.part2X != null ? merged.part2X : (baseForOffset + (merged.part2Offset != null ? merged.part2Offset : 50))
+            const part2Y = (merged.part2Y != null) ? merged.part2Y : ((merged.y != null) ? merged.y : currentY)
+            const size = merged.size || 12
+            if (!merged.noLabel && label) {
+              firstPage.drawText(`${label} `, { x: part1X, y: part1Y, size, font: helvetica, color: pdfLibRgb(0,0,0) })
+              const lw = helvetica.widthOfTextAtSize(`${label} `, size)
+              firstPage.drawText(firstPart, { x: part1X + lw, y: part1Y, size, font: helvetica, color: pdfLibRgb(0,0,0) })
+            } else {
+              firstPage.drawText(firstPart, { x: part1X, y: part1Y, size, font: helvetica, color: pdfLibRgb(0,0,0) })
+            }
+            if (restPart) firstPage.drawText(restPart, { x: part2X, y: part2Y, size, font: helvetica, color: pdfLibRgb(0,0,0) })
+            if (merged.y == null) currentY -= lineHeight
+            return
+          }
+
+          if (boxOpts) return drawWrapped(label, value, boxOpts)
+          return draw(label, value)
+        }
+
+      drawField('clientLastName', '', pdfData.clientLastName || pdfData.clientName || '')
+      drawField('clientFirstName', '', pdfData.clientFirstName || '')
+      drawField('clientCNP', 'CNP', pdfData.clientCNP || pdfData.cnp || '')
+      drawField('clientSeries', 'Serie', pdfData.clientSeries || pdfData.serie || '')
+      // Address/location uses configurable box when provided via pdfData.fieldBoxes.clientAddress
+      drawField('clientAddress', 'Adresa', pdfData.clientAddress || pdfData.address || '')
+      drawField('jobName', 'Job', pdfData.jobName || '')
+      drawField('completedAt', 'Finalizat la', pdfData.completedAt || '')
+      if (pdfData.receptionNumber) drawField('receptionNumber', 'Numar receptie', String(pdfData.receptionNumber))
 
       const modified = await pdfDoc.save()
       res.setHeader('Content-Type', 'application/pdf')
@@ -84,13 +179,13 @@ module.exports = async (req, res) => {
 
       doc.fontSize(18).text(pdfData.jobName || 'Job Summary', { align: 'center' })
       doc.moveDown()
-      doc.fontSize(12).text(`Client: ${pdfData.clientName || ''}`)
-      doc.text(`Client email: ${pdfData.clientEmail || ''}`)
-      if (pdfData.clientFirstName || pdfData.clientLastName) doc.text(`Client name parts: ${pdfData.clientFirstName || ''} ${pdfData.clientLastName || ''}`)
-      if (pdfData.clientCNP) doc.text(`CNP: ${pdfData.clientCNP}`)
-      if (pdfData.clientSeries) doc.text(`Serie: ${pdfData.clientSeries}`)
-      if (pdfData.clientAddress) doc.text(`Adresa: ${pdfData.clientAddress}`)
-      doc.text(`Completed at: ${pdfData.completedAt || ''}`)
+      doc.fontSize(12).text(`Client ${pdfData.clientName || ''}`)
+      doc.text(`Client email ${pdfData.clientEmail || ''}`)
+      if (pdfData.clientFirstName || pdfData.clientLastName) doc.text(`Client name parts ${pdfData.clientFirstName || ''} ${pdfData.clientLastName || ''}`)
+      if (pdfData.clientCNP) doc.text(`CNP ${pdfData.clientCNP}`)
+      if (pdfData.clientSeries) doc.text(`Serie ${pdfData.clientSeries}`)
+      if (pdfData.clientAddress) doc.text(`Adresa ${pdfData.clientAddress}`)
+      doc.text(`Completed at ${pdfData.completedAt || ''}`)
       doc.moveDown()
       doc.fontSize(14).text('Tasks:', { underline: true })
       const tasks = Array.isArray(pdfData.tasks) ? pdfData.tasks : []
