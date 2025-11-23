@@ -228,6 +228,15 @@ const EmployeeDashboard = () => {
             if (res && !res.ok) console.warn('⚠️ Job email failed', res)
           }).catch(err => console.error('Job email error', err))
         }
+        // Mark job as completed in DB so UI and other roles see consistent state
+        try {
+          const completedAt = data[0].completed_at || new Date().toISOString()
+          await supabase.from('jobs').update({ status: 'completed', completed_at: completedAt }).eq('id', job.id)
+          setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'completed', completed_at: completedAt } : j))
+        } catch (updErr) {
+          console.warn('Could not update job status to completed', updErr)
+        }
+
         setMessage('✅ Task completat! 🎉 Jobul este finalizat!')
       } else {
         // Nu trimitem email la fiecare task — doar actualizăm mesajul UI
