@@ -542,6 +542,16 @@ export default function CEODashboard() {
               console.warn('assign_reception_number_to_job RPC failed or not present', rpcErr)
             }
 
+            // mark job as completed in DB so UI & download button reflect final state
+            try {
+              const up = { status: 'completed', completed_at: completedAt }
+              if (receptionNumber != null) up.reception_number = receptionNumber
+              await supabase.from('jobs').update(up).eq('id', job.id)
+              setJobs(prev => prev.map(j => j.id === job.id ? { ...j, ...up } : j))
+            } catch (updErr) {
+              console.warn('Failed to update job status/receptionNumber', updErr)
+            }
+
             // send job-level email (no PDF by default). receptionNumber is included in payload for downstream use.
             try {
               const res = await sendJobCompletionEmail({
@@ -1149,7 +1159,7 @@ export default function CEODashboard() {
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button onClick={() => setExpandedJob(isExpanded ? null : job.id)} style={{ fontSize: 12 }}>{isExpanded ? '🔼 Ascunde' : '🔽 Detalii'}</button>
                     <button onClick={() => startEditJob(job)} style={{ fontSize: 12 }}>✏️ Editează</button>
-                    {job.status === 'completed' && (
+                    {(job.status === 'completed' || areAllTasksCompleted(tasks, job.id)) && (
                       <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
                     )}
                     <button onClick={() => deleteJob(job.id)} style={{ fontSize: 12, color: 'red' }}>🗑️ Șterge</button>

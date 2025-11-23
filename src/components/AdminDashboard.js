@@ -507,6 +507,14 @@ const AdminDashboard = () => {
             const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
             const completedAt = new Date().toISOString()
             // send job email (no PDF by default)
+            // mark job as completed in DB (so UI can depend on job.status too)
+            try {
+              await supabase.from('jobs').update({ status: 'completed', completed_at: completedAt }).eq('id', job.id)
+              setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'completed', completed_at: completedAt } : j))
+            } catch (updErr) {
+              console.warn('Could not update job status to completed', updErr)
+            }
+
             sendJobCompletionEmail({
               to: job.client_email,
               clientName: job.client_name,
