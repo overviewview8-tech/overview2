@@ -500,24 +500,11 @@ const EmployeeDashboard = () => {
         completedAt: job.completed_at || new Date().toISOString(),
         receptionNumber: job.reception_number || job.receptionNumber || null
       }
-
-      const res = await fetch('/api/generate-pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdfData }) })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        console.error('Generate PDF failed', err)
-        setError(err.error || 'Eroare generare PDF')
-        return
+      const { generateAndDownloadPdf } = await import('../utils/generatePdfClient')
+      const res = await generateAndDownloadPdf(pdfData)
+      if (!res || !res.ok) {
+        setError(res && res.error ? res.error : 'Eroare generare PDF')
       }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      const filenameBase = `${(job.client_name || 'client').replace(/[^a-z0-9\-_\. ]/gi, '_')}_${(job.name || 'job').replace(/[^a-z0-9\-_\. ]/gi, '_')}`
-      a.href = url
-      a.download = `${filenameBase}_filled.pdf`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
     } catch (err) {
       console.error('downloadPdfForJob error', err)
       setError(err.message || 'Eroare la descarcare PDF')
@@ -576,7 +563,7 @@ const EmployeeDashboard = () => {
                     <button onClick={() => setExpandedJob(isExpanded ? null : job.id)} style={{ fontSize: 12 }}>
                       {isExpanded ? '🔼 Ascunde' : '🔽 Detalii'}
                     </button>
-                    {job.status === 'completed' && (
+                    {(job.status === 'completed' || areAllTasksCompleted(tasks, job.id)) && (
                       <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
                     )}
                   </div>
