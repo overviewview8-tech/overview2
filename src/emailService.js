@@ -37,29 +37,35 @@ export async function sendTaskCompletionEmail({ to, clientName, jobName, taskNam
   return postSendEmail(payload)
 }
 
-export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt, clientCNP, clientSeries, clientAddress, clientFirstName, clientLastName }) {
+export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt, clientCNP, clientSeries, clientAddress, clientFirstName, clientLastName, receptionNumber }, options = {}) {
   if (!to) return { ok: false, error: 'No recipient' }
   const subject = `Job finalizat: ${jobName}`
   const taskList = tasks.map(t => `- ${t.name} (${t.value ? t.value + ' lei' : 'N/A'})`).join('\n')
   const htmlTasks = tasks.map(t => `<li>${t.name} — ${t.value ? t.value + ' lei' : 'N/A'}</li>`).join('')
   const text = `Bună ${clientName || ''},\n\nJobul "${jobName}" a fost finalizat la ${completedAt || new Date().toLocaleString()}.\n\nTaskuri:\n${taskList}\n\nValoare totală: ${totalValue != null ? totalValue + ' lei' : 'N/A'}`
   const html = `<p>Bună ${clientName || ''},</p><p>Jobul <strong>${jobName}</strong> a fost finalizat la ${completedAt || new Date().toLocaleString()}.</p><ul>${htmlTasks}</ul><p><strong>Valoare totală:</strong> ${totalValue != null ? totalValue + ' lei' : 'N/A'}</p>`
-  // Request the server to fill the `blank` template with client personal data
-  const pdfData = {
-    template: 'blank',
-    clientName,
-    clientFirstName: clientFirstName || null,
-    clientLastName: clientLastName || null,
-    clientCNP: clientCNP || null,
-    clientSeries: clientSeries || null,
-    clientAddress: clientAddress || null,
-    clientEmail: to,
-    jobName,
-    tasks,
-    totalValue,
-    completedAt
+  // By default do NOT attach a PDF. Pass { includePdf: true } to include the filled template.
+  const includePdf = options.includePdf === true
+  const payload = { to, subject, text, html }
+  if (includePdf) {
+    const pdfData = {
+      template: 'blank',
+      clientName,
+      clientFirstName: clientFirstName || null,
+      clientLastName: clientLastName || null,
+      clientCNP: clientCNP || null,
+      clientSeries: clientSeries || null,
+      clientAddress: clientAddress || null,
+      clientEmail: to,
+      jobName,
+      tasks,
+      totalValue,
+      completedAt,
+      receptionNumber: receptionNumber != null ? receptionNumber : null
+    }
+    payload.pdfData = pdfData
   }
-  return postSendEmail({ to, subject, text, html, pdfData })
+  return postSendEmail(payload)
 }
 
 export function areAllTasksCompleted(allTasks, jobId) {

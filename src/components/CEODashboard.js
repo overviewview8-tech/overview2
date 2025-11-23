@@ -469,29 +469,67 @@ export default function CEODashboard() {
       setTasks(updatedTasks)
 
       if (newStatus === 'completed') {
-        // send job-completion email only when all tasks for the job are completed
+        // Send a per-task email for this completed task
         const job = jobs.find(j => j.id === task.job_id)
         if (job && job.client_email) {
+          try {
+            await sendTaskCompletionEmail({
+              to: job.client_email,
+              clientName: job.client_name,
+              jobName: job.name,
+              taskName: data[0].name,
+              taskDescription: data[0].description,
+              taskValue: data[0].value,
+              completedAt: data[0].completed_at
+            })
+          } catch (err) {
+            console.warn('Task email failed', err)
+          }
+
+          // If all tasks are completed, attempt to assign a reception number via RPC
           const allCompleted = areAllTasksCompleted(updatedTasks, task.job_id)
           if (allCompleted) {
             const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
             const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
             const completedAt = new Date().toISOString()
-            sendJobCompletionEmail({
-              to: job.client_email,
-              clientName: job.client_name,
-              jobName: job.name,
-              tasks: jobTasks,
-              totalValue,
-              completedAt,
-              clientFirstName: job.client_first_name,
-              clientLastName: job.client_last_name,
-              clientCNP: job.client_cnp,
-              clientSeries: job.client_id_series,
-              clientAddress: job.client_address
-            }).then(res => {
+
+            let receptionNumber = null
+            try {
+              // RPC may not exist in some environments; call it but don't fail the flow if missing
+              const rpcRes = await supabase.rpc('assign_reception_number_to_job', { p_job_id: job.id, p_completed_at: completedAt })
+              if (rpcRes && rpcRes.data) {
+                if (Array.isArray(rpcRes.data) && rpcRes.data.length > 0) {
+                  receptionNumber = rpcRes.data[0].reception_number || rpcRes.data[0].receptionnumber || rpcRes.data[0].receptionnumber || null
+                } else if (typeof rpcRes.data === 'object') {
+                  receptionNumber = rpcRes.data.reception_number || rpcRes.data.receptionnumber || null
+                } else if (typeof rpcRes.data === 'number') {
+                  receptionNumber = rpcRes.data
+                }
+              }
+            } catch (rpcErr) {
+              console.warn('assign_reception_number_to_job RPC failed or not present', rpcErr)
+            }
+
+            // send job-level email (no PDF by default). receptionNumber is included in payload for downstream use.
+            try {
+              const res = await sendJobCompletionEmail({
+                to: job.client_email,
+                clientName: job.client_name,
+                jobName: job.name,
+                tasks: jobTasks,
+                totalValue,
+                completedAt,
+                clientFirstName: job.client_first_name,
+                clientLastName: job.client_last_name,
+                clientCNP: job.client_cnp,
+                clientSeries: job.client_id_series,
+                clientAddress: job.client_address,
+                receptionNumber
+              })
               if (res && !res.ok) console.warn('⚠️ Job email failed', res)
-            }).catch(err => console.error('Job email error', err))
+            } catch (err) {
+              console.error('Job email error', err)
+            }
           }
         }
       }

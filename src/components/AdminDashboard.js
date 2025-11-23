@@ -483,6 +483,21 @@ const AdminDashboard = () => {
       
       // Dacă e completat, trimite email pentru JOB doar când toate taskurile sunt finalizate
       if (newStatus === 'completed') {
+        // Trimite email pentru TASK (fiecare task la finalizare)
+        try {
+          await sendTaskCompletionEmail({
+            to: job && job.client_email ? job.client_email : null,
+            clientName: job && job.client_name ? job.client_name : null,
+            jobName: job ? job.name : null,
+            taskName: data[0].name,
+            taskDescription: data[0].description,
+            taskValue: data[0].value,
+            completedAt: data[0].completed_at
+          })
+        } catch (err) {
+          console.warn('Task email failed', err)
+        }
+
         const job = jobs.find(j => j.id === task.job_id)
         // use the updatedTasks array to determine completion state
         if (job && job.client_email) {
@@ -491,6 +506,7 @@ const AdminDashboard = () => {
             const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
             const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
             const completedAt = new Date().toISOString()
+            // send job email (no PDF by default)
             sendJobCompletionEmail({
               to: job.client_email,
               clientName: job.client_name,
