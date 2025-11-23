@@ -63,7 +63,7 @@ export default function CEODashboard() {
     try {
       const [jobsRes, tasksRes, profilesRes] = await Promise.all([
         supabase.from('jobs').select('*').order('created_at', { ascending: false }),
-        supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+        supabase.from('tasks').select('*').order('created_at', { ascending: true }),
         supabase.from('profiles').select('id, email, full_name, role, created_at')
       ])
       if (jobsRes.error) throw jobsRes.error
