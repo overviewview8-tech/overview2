@@ -492,7 +492,7 @@ const EmployeeDashboard = () => {
 
   const downloadPdfForJob = async (job) => {
     try {
-      const jobTasks = tasks.filter(t => t.job_id === job.id)
+      const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
       const pdfData = {
         template: 'blank',
@@ -547,7 +547,7 @@ const EmployeeDashboard = () => {
           <p style={{ color: '#999' }}>Nu ai taskuri asignate momentan.</p>
         ) : (
           jobs.map(job => {
-            const jobTasks = tasks.filter(t => t.job_id === job.id)
+            const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
             console.log(`📊 Job "${job.name}" (${job.id}):`)
             console.log('  - Tasks in state:', tasks.length)
             console.log('  - Tasks for this job:', jobTasks.length)

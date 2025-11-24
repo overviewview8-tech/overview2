@@ -101,7 +101,7 @@ export default function CEODashboard() {
 
   const downloadPdfForJob = async (job) => {
     try {
-      const jobTasks = tasks.filter(t => t.job_id === job.id)
+      const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
       const pdfData = {
         template: 'blank',
@@ -1112,7 +1112,7 @@ export default function CEODashboard() {
       <section>
         <h3>Joburi ({jobs.length})</h3>
         {jobs.map(job => {
-          const jobTasks = tasks.filter(t => t.job_id === job.id)
+          const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
           const totalHours = jobTasks.reduce((sum, t) => sum + (parseFloat(t.estimated_hours) || 0), 0)
           const isExpanded = expandedJob === job.id
           const isEditing = editingJobId === job.id
