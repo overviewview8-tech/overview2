@@ -25,7 +25,7 @@ const AdminDashboard = () => {
   const [clientIdSeries, setClientIdSeries] = useState('')
   const [clientCNP, setClientCNP] = useState('')
   const [clientAddress, setClientAddress] = useState('')
-  const [newJobTasks, setNewJobTasks] = useState([{ name: '', description: '', assigned_to: [], estimated_hours: '' }])
+  const [newJobTasks, setNewJobTasks] = useState([{ name: '', description: '', assigned_to: [], estimated_hours: '', deadline: '' }])
 
   // Stare pentru job expandat
   const [expandedJob, setExpandedJob] = useState(null)
@@ -39,7 +39,7 @@ const AdminDashboard = () => {
 
   // Stare pentru adăugare task la job existent
   const [addingTaskToJob, setAddingTaskToJob] = useState(null)
-  const [newTaskData, setNewTaskData] = useState({ name: '', description: '', assigned_to: [], estimated_hours: '' })
+  const [newTaskData, setNewTaskData] = useState({ name: '', description: '', assigned_to: [], estimated_hours: '', deadline: '' })
 
   // Stare gestionare angajați
   const [showEmployeeManagement, setShowEmployeeManagement] = useState(false)
@@ -215,6 +215,7 @@ const AdminDashboard = () => {
         assigned_to_emails: null,
         estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
         value: null,
+        deadline: t.deadline ? (new Date(t.deadline)).toISOString() : null,
         created_by: user.id
       }))
 
@@ -275,7 +276,7 @@ const AdminDashboard = () => {
   }
 
   const addNewJobTask = () => {
-    setNewJobTasks(prev => [...prev, { name: '', description: '', assigned_to: [], estimated_hours: '' }])
+    setNewJobTasks(prev => [...prev, { name: '', description: '', assigned_to: [], estimated_hours: '', deadline: '' }])
   }
 
   const removeNewJobTask = (idx) => {
@@ -374,7 +375,8 @@ const AdminDashboard = () => {
       description: task.description || '',
       status: task.status,
       assigned_to: Array.isArray(task.assigned_to) ? task.assigned_to : task.assigned_to ? [task.assigned_to] : [],
-      estimated_hours: task.estimated_hours || ''
+      estimated_hours: task.estimated_hours || '',
+      deadline: task.deadline || ''
     })
   }
 
@@ -397,6 +399,9 @@ const AdminDashboard = () => {
       }
       if (taskEdits.estimated_hours !== undefined) {
         updates.estimated_hours = taskEdits.estimated_hours ? parseFloat(taskEdits.estimated_hours) : null
+      }
+      if (taskEdits.deadline !== undefined) {
+        updates.deadline = taskEdits.deadline ? (new Date(taskEdits.deadline)).toISOString() : null
       }
 
       // Try update, if DB expects scalar uuid for `assigned_to` and errors,
@@ -554,12 +559,12 @@ const AdminDashboard = () => {
   // Adăugare task la job existent
   const startAddTaskToJob = (jobId) => {
     setAddingTaskToJob(jobId)
-    setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '' })
+    setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '', deadline: '' })
   }
 
   const cancelAddTask = () => {
     setAddingTaskToJob(null)
-    setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '' })
+    setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '', deadline: '' })
   }
 
   const handleAddTask = async (e) => {
@@ -577,6 +582,7 @@ const AdminDashboard = () => {
         assigned_to_emails: null,
         estimated_hours: newTaskData.estimated_hours ? parseFloat(newTaskData.estimated_hours) : null,
         value: null,
+        deadline: newTaskData.deadline ? (new Date(newTaskData.deadline)).toISOString() : null,
         created_by: user.id
       }
       // Insert with same safe-retry logic as bulk insert
@@ -593,7 +599,7 @@ const AdminDashboard = () => {
         }
       }
 
-      setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '' })
+      setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '', deadline: '' })
       setAddingTaskToJob(null)
       setMessage('✅ Task adăugat!')
       setTimeout(() => setMessage(null), 3000)
@@ -1088,6 +1094,10 @@ const AdminDashboard = () => {
                         <label style={{ fontSize: 12 }}>Ore:</label>
                         <input type="number" placeholder="Ore" value={t.estimated_hours} onChange={e => updateNewJobTaskField(i, 'estimated_hours', e.target.value)} style={{ width: 96, padding: 6 }} step="0.5" min="0" />
                       </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <label style={{ fontSize: 12 }}>Termen (deadline):</label>
+                                      <input type="datetime-local" value={t.deadline ? t.deadline.slice(0,16) : ''} onChange={e => updateNewJobTaskField(i, 'deadline', e.target.value)} style={{ padding: 6 }} />
+                                    </div>
                       {/* Admin: task value input removed on purpose */}
                     </div>
 
@@ -1248,6 +1258,15 @@ const AdminDashboard = () => {
                                 min="0"
                               />
                             </div>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                              <label style={{ fontSize: 12 }}>Termen (deadline):</label>
+                              <input
+                                type="datetime-local"
+                                value={taskEdits.deadline ? taskEdits.deadline.slice(0,16) : ''}
+                                onChange={e => setTaskEdits(prev => ({ ...prev, deadline: e.target.value }))}
+                                style={{ padding: 6 }}
+                              />
+                            </div>
                             {/* Admin: task value editing removed */}
                             <select value={taskEdits.status || 'todo'} onChange={e => setTaskEdits(prev => ({ ...prev, status: e.target.value }))} style={{ marginRight: 8 }}>
                               <option value="todo">Todo</option>
@@ -1292,6 +1311,7 @@ const AdminDashboard = () => {
                                 {task.completed_by && <div>Done by: {task.completed_by}</div>}
                                 {task.completed_at && <div>Completed at: {new Date(task.completed_at).toLocaleString('ro-RO')}</div>}
                                 <div>Created at: {new Date(task.created_at).toLocaleString('ro-RO')}</div>
+                                {task.deadline && <div>Termen limită: {new Date(task.deadline).toLocaleString('ro-RO')}</div>}
                               </div>
                             )}
                           </div>
@@ -1314,6 +1334,10 @@ const AdminDashboard = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <label style={{ fontSize: 12 }}>Ore:</label>
                           <input type="number" placeholder="Ore estimate" value={newTaskData.estimated_hours} onChange={e => setNewTaskData(prev => ({ ...prev, estimated_hours: e.target.value }))} style={{ width: 100, padding: 6 }} step="0.5" min="0" />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <label style={{ fontSize: 12 }}>Termen (deadline):</label>
+                          <input type="datetime-local" value={newTaskData.deadline || ''} onChange={e => setNewTaskData(prev => ({ ...prev, deadline: e.target.value }))} style={{ padding: 6 }} />
                         </div>
                         {/* Admin cannot set task value here */}
                         <div>

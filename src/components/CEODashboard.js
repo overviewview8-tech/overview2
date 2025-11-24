@@ -25,7 +25,7 @@ export default function CEODashboard() {
   const [clientCNP, setClientCNP] = useState('')
   const [clientAddress, setClientAddress] = useState('')
   const [jobValue, setJobValue] = useState('')
-  const [newJobTasks, setNewJobTasks] = useState([{ name: '', description: '', assigned_to: [], estimated_hours: '', value: '' }])
+  const [newJobTasks, setNewJobTasks] = useState([{ name: '', description: '', assigned_to: [], estimated_hours: '', value: '', deadline: '' }])
 
   // Job/task UI state
   const [expandedJob, setExpandedJob] = useState(null)
@@ -35,7 +35,7 @@ export default function CEODashboard() {
   const [editingTaskId, setEditingTaskId] = useState(null)
   const [taskEdits, setTaskEdits] = useState({})
   const [addingTaskToJob, setAddingTaskToJob] = useState(null)
-  const [newTaskData, setNewTaskData] = useState({ name: '', description: '', assigned_to: [], estimated_hours: '', value: '' })
+  const [newTaskData, setNewTaskData] = useState({ name: '', description: '', assigned_to: [], estimated_hours: '', value: '', deadline: '' })
 
   // Employee management
   const [showEmployeeManagement, setShowEmployeeManagement] = useState(false)
@@ -250,7 +250,7 @@ export default function CEODashboard() {
       if (jobErr) throw jobErr
 
       const jobId = newJob[0].id
-      const tasksToInsert = newJobTasks
+          const tasksToInsert = newJobTasks
         .filter(t => t.name && t.name.trim())
         .map(t => ({
           job_id: jobId,
@@ -260,7 +260,8 @@ export default function CEODashboard() {
           assigned_to: Array.isArray(t.assigned_to) ? (t.assigned_to.length > 0 ? t.assigned_to : null) : (t.assigned_to ? [t.assigned_to] : null),
           assigned_to_emails: null,
           estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
-          value: t.value ? parseFloat(t.value) : null,
+              value: t.value ? parseFloat(t.value) : null,
+              deadline: t.deadline ? (new Date(t.deadline)).toISOString() : null,
           created_by: user?.id || null
         }))
 
@@ -305,7 +306,7 @@ export default function CEODashboard() {
       setClientemail('')
       setClientPhone('')
       setJobValue('')
-      setNewJobTasks([{ name: '', description: '', assigned_to: [], estimated_hours: '', value: '' }])
+      setNewJobTasks([{ name: '', description: '', assigned_to: [], estimated_hours: '', value: '', deadline: '' }])
       setShowCreateWithTasks(false)
       setMessage('✅ Job și taskuri create!')
       setTimeout(() => setMessage(null), 3000)
@@ -417,7 +418,8 @@ export default function CEODashboard() {
       status: task.status,
       assigned_to: Array.isArray(task.assigned_to) ? task.assigned_to : task.assigned_to ? [task.assigned_to] : [],
       estimated_hours: task.estimated_hours || '',
-      value: task.value || ''
+      value: task.value || '',
+      deadline: task.deadline || ''
     })
   }
 
@@ -444,6 +446,9 @@ export default function CEODashboard() {
       }
       if (taskEdits.value !== undefined) {
         updates.value = taskEdits.value ? parseFloat(taskEdits.value) : null
+      }
+      if (taskEdits.deadline !== undefined) {
+        updates.deadline = taskEdits.deadline ? (new Date(taskEdits.deadline)).toISOString() : null
       }
 
       // Try update; if DB rejects array for uuid, retry using first assignee
@@ -626,12 +631,13 @@ export default function CEODashboard() {
         assigned_to_emails: null,
         estimated_hours: newTaskData.estimated_hours ? parseFloat(newTaskData.estimated_hours) : null,
         value: newTaskData.value ? parseFloat(newTaskData.value) : null,
+        deadline: newTaskData.deadline ? (new Date(newTaskData.deadline)).toISOString() : null,
         created_by: user?.id || null
       }
       const { error: addErr } = await supabase.from('tasks').insert([taskToInsert])
       if (addErr) throw addErr
 
-      setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '', value: '' })
+      setNewTaskData({ name: '', description: '', assigned_to: [], estimated_hours: '', value: '', deadline: '' })
       setAddingTaskToJob(null)
       setMessage('✅ Task adăugat!')
       setTimeout(() => setMessage(null), 3000)
@@ -1100,6 +1106,10 @@ export default function CEODashboard() {
                                 <input type="number" placeholder="Ore" value={t.estimated_hours} onChange={e => updateNewJobTaskField(i, 'estimated_hours', e.target.value)} style={{ width: 96, padding: 6 }} step="0.5" min="0" />
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <label style={{ fontSize: 12 }}>Termen (deadline):</label>
+                                <input type="datetime-local" value={t.deadline ? t.deadline.slice(0,16) : ''} onChange={e => updateNewJobTaskField(i, 'deadline', e.target.value)} style={{ padding: 6 }} />
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <label style={{ fontSize: 12 }}>Valoare (lei):</label>
                                 <input type="number" placeholder="Valoare" value={t.value} onChange={e => updateNewJobTaskField(i, 'value', e.target.value)} style={{ width: 120, padding: 6 }} step="0.01" min="0" />
                               </div>
@@ -1210,6 +1220,10 @@ export default function CEODashboard() {
                               <input type="number" placeholder="Ore estimate" value={taskEdits.estimated_hours || ''} onChange={e => setTaskEdits(prev => ({ ...prev, estimated_hours: e.target.value }))} style={{ width: 100 }} step="0.5" min="0" />
                             </div>
                             <div style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'center' }}>
+                              <label style={{ fontSize: 12 }}>Termen (deadline):</label>
+                              <input type="datetime-local" value={taskEdits.deadline ? taskEdits.deadline.slice(0,16) : ''} onChange={e => setTaskEdits(prev => ({ ...prev, deadline: e.target.value }))} style={{ padding: 6 }} />
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'center' }}>
                               <label style={{ fontSize: 12 }}>Valoare (lei):</label>
                               <input type="number" placeholder="Valoare" value={taskEdits.value || ''} onChange={e => setTaskEdits(prev => ({ ...prev, value: e.target.value }))} style={{ width: 120 }} step="0.01" min="0" />
                             </div>
@@ -1248,6 +1262,7 @@ export default function CEODashboard() {
                                 {task.completed_by && <div>Done by: {task.completed_by}</div>}
                                 {task.completed_at && <div>Completed at: {new Date(task.completed_at).toLocaleString('ro-RO')}</div>}
                                 <div>Created at: {new Date(task.created_at).toLocaleString('ro-RO')}</div>
+                                {task.deadline && <div>Termen limită: {new Date(task.deadline).toLocaleString('ro-RO')}</div>}
                               </div>
                             )}
                           </div>
@@ -1264,6 +1279,10 @@ export default function CEODashboard() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <label style={{ fontSize: 12 }}>Ore:</label>
                           <input type="number" placeholder="Ore estimate" value={newTaskData.estimated_hours} onChange={e => setNewTaskData(prev => ({ ...prev, estimated_hours: e.target.value }))} style={{ width: 100, padding: 6 }} step="0.5" min="0" />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <label style={{ fontSize: 12 }}>Termen (deadline):</label>
+                          <input type="datetime-local" value={newTaskData.deadline || ''} onChange={e => setNewTaskData(prev => ({ ...prev, deadline: e.target.value }))} style={{ padding: 6 }} />
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <label style={{ fontSize: 12 }}>Valoare (lei):</label>
