@@ -14,7 +14,11 @@ async function postSendEmail(payload) {
 }
 
 export async function sendTaskCompletionEmail({ to, clientName, jobName, taskName, taskDescription, taskValue, completedAt }, options = {}) {
-  if (!to) return { ok: false, error: 'No recipient' }
+  if (!to || (Array.isArray(to) && to.length === 0)) return { ok: false, error: 'No recipient' }
+  // normalize recipient list: accept string or array
+  if (Array.isArray(to)) {
+    to = to.join(',')
+  }
   const subject = `Task finalizat: ${taskName}`
   const completedStr = completedAt || new Date().toLocaleString()
   const text = `Bună ziua,\n\nEtapa de lucru: "${taskName}" a fost finalizata.\n\nVă mulțumim că ați ales Survalley!\n\nCu Stima,\nEchipa Survalley\n\nSite: Survalley.ro\nNr. telefon:\nRel. cu publicul: 0771791893\nDep. Cadastru nr. tel: 0741155172\n\nÎn conformitate cu Regulamentul general privind protecția datelor (GDPR) (UE) 2016/679, avem datoria legală de a proteja orice informație pe care o colectăm de la dvs. Informațiile conținute în acest e-mail și orice atașament pot fi privilegiate sau confidențiale și destinate utilizării exclusive a destinatarului original. Dacă ați primit acest e-mail din greșeală, vă rugăm să informați expeditorul imediat și să ștergeți e-mailul, inclusiv golirea căsuței de e-mail șterse.\n\nUnder the General Data Protection Regulation (GDPR) (EU) 2016/679, we have a legal duty to protect any information we collect from you. Information contained in this email and any attachments may be privileged or confidential and intended for the exclusive use of the original recipient. If you have received this email by mistake, please advise the sender immediately and delete the email, including emptying your deleted email box.\n\nContact: contact@survalley.ro`;
@@ -45,11 +49,17 @@ export async function sendTaskCompletionEmail({ to, clientName, jobName, taskNam
     payload.pdfData = pdfData
   }
 
-  return postSendEmail(payload)
+  const res = await postSendEmail(payload)
+  if (!res.ok) console.warn('sendTaskCompletionEmail result:', res)
+  return res
 }
 
 export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt, clientCNP, clientSeries, clientAddress, clientFirstName, clientLastName, receptionNumber }, options = {}) {
-  if (!to) return { ok: false, error: 'No recipient' }
+  if (!to || (Array.isArray(to) && to.length === 0)) return { ok: false, error: 'No recipient' }
+  // normalize recipient list: accept string or array
+  if (Array.isArray(to)) {
+    to = to.join(',')
+  }
   const subject = `Înregistrare documentație cadastrală: ${jobName}`
   const completedStr = completedAt || new Date().toLocaleString()
   const text = `Bună ziua!\n\nDorim sa va informam ca inregistrarea documentatiei cadastrale a fost realizata cu succes pentru jobul "${jobName}". Pe masura ce vom primi detalii de la OCPI va vom informa. Va multumim ca ati ales Survalley!\n\nSite: Survalley.ro\nNr. telefon:\nRel. cu publicul: 0771791893\nDep. Cadastru nr. tel: 0741155172\n\nÎn conformitate cu Regulamentul general privind protecția datelor (GDPR) (UE) 2016/679, avem datoria legală de a proteja orice informație pe care o colectăm de la dvs. Informațiile conținute în acest e-mail și orice atașament pot fi privilegiate sau confidențiale și destinate utilizării exclusive a destinatarului original. Dacă ați primit acest e-mail din greșeală, vă rugăm să informați expeditorul imediat și să ștergeți e-mailul, inclusiv golirea căsuței de e-mail șterse.\n\nUnder the General Data Protection Regulation (GDPR) (EU) 2016/679, we have a legal duty to protect any information we collect from you. Information contained in this email and any attachments may be privileged or confidential and intended for the exclusive use of the original recipient. If you have received this email by mistake, please advise the sender immediately and delete the email, including emptying your deleted email box.\n\nContact: contact@survalley.ro`
@@ -85,7 +95,9 @@ export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = 
     }
     payload.pdfData = pdfData
   }
-  return postSendEmail(payload)
+  const res = await postSendEmail(payload)
+  if (!res.ok) console.warn('sendJobCompletionEmail result:', res)
+  return res
 }
 
 export function areAllTasksCompleted(allTasks, jobId) {
