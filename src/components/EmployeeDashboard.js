@@ -200,46 +200,82 @@ const EmployeeDashboard = () => {
       if (err) throw err
       
       // Actualizează lista de task-uri
-      const updatedTasks = tasks.map(t => t.id === task.id ? data[0] : t)
+      const updatedTask = data[0]
+      const updatedTasks = tasks.map(t => t.id === task.id ? updatedTask : t)
       setTasks(updatedTasks)
 
-      // Decidează trimiterea email-ului: trimitem doar când toate taskurile
-      // din job sunt completate (cerința: mailul se trimite numai la
-      // finalizarea jobului, nu la fiecare task).
+      // find the job related to this task
       const job = jobs.find(j => j.id === task.job_id)
+
+      // Send per-task email when employee completes a task (include client + assigned employees)
+      try {
+        const assignedIds = Array.isArray(updatedTask.assigned_to) ? updatedTask.assigned_to : (updatedTask.assigned_to ? [updatedTask.assigned_to] : [])
+        const assignedEmails = assignedIds.map(pid => (profiles.find(p => p.id === pid) || {}).email).filter(Boolean)
+        const taskRecipients = Array.from(new Set([...(job && job.client_email ? [job.client_email] : []), ...assignedEmails, userProfile?.email].filter(Boolean)))
+
+        if (taskRecipients.length > 0) {
+          await sendTaskCompletionEmail({
+            to: taskRecipients,
+            clientName: job ? job.client_name : null,
+            jobName: job ? job.name : null,
+            taskName: updatedTask.name,
+            taskDescription: updatedTask.description,
+            taskValue: updatedTask.value,
+            completedAt: updatedTask.completed_at
+          })
+        }
+      } catch (err) {
+        console.warn('Task email failed', err)
+      }
+
+      // Now check if the whole job is completed and send job-level email to client + all assigned employees
       const jobTasks = updatedTasks.filter(t => t.job_id === task.job_id)
       const remainingTasks = jobTasks.filter(t => t.status !== 'completed').length
 
-      if (remainingTasks === 0) {
-        // Toate taskurile sunt completate — trimitem emailul de job
-        if (job && job.client_email) {
-          sendJobCompletionEmail({
-            to: job.client_email,
-            clientName: job.client_name,
-            jobName: job.name,
-            jobValue: job.total_value,
-            completedAt: data[0].completed_at || new Date().toISOString(),
-            clientFirstName: job.client_first_name,
-            clientLastName: job.client_last_name,
-            clientCNP: job.client_cnp,
-            clientSeries: job.client_id_series,
-            clientAddress: job.client_address
-          }).then(res => {
-            if (res && !res.ok) console.warn('⚠️ Job email failed', res)
-          }).catch(err => console.error('Job email error', err))
-        }
-        // Mark job as completed in DB so UI and other roles see consistent state
+      if (remainingTasks === 0 && job) {
+        const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
+        const completedAt = new Date().toISOString()
+
+        // compute all assigned employees across job tasks
+        const allAssignedIds = jobTasks.reduce((acc, t) => {
+          const ids = Array.isArray(t.assigned_to) ? t.assigned_to : (t.assigned_to ? [t.assigned_to] : [])
+          return acc.concat(ids)
+        }, [])
+        const allAssignedEmails = Array.from(new Set(allAssignedIds.map(pid => (profiles.find(p => p.id === pid) || {}).email).filter(Boolean)))
+        const jobRecipients = Array.from(new Set([...(job.client_email ? [job.client_email] : []), ...allAssignedEmails]))
+
+        // mark job as completed in DB so UI and other roles see consistent state
         try {
-          const completedAt = data[0].completed_at || new Date().toISOString()
           await supabase.from('jobs').update({ status: 'completed', completed_at: completedAt }).eq('id', job.id)
           setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'completed', completed_at: completedAt } : j))
         } catch (updErr) {
           console.warn('Could not update job status to completed', updErr)
         }
 
+        // send job-level email
+        try {
+          if (jobRecipients.length > 0) {
+            const res = await sendJobCompletionEmail({
+              to: jobRecipients,
+              clientName: job.client_name,
+              jobName: job.name,
+              tasks: jobTasks,
+              totalValue,
+              completedAt,
+              clientFirstName: job.client_first_name,
+              clientLastName: job.client_last_name,
+              clientCNP: job.client_cnp,
+              clientSeries: job.client_id_series,
+              clientAddress: job.client_address
+            })
+            if (res && !res.ok) console.warn('⚠️ Job email failed', res)
+          }
+        } catch (err) {
+          console.error('Job email error', err)
+        }
+
         setMessage('✅ Task completat! 🎉 Jobul este finalizat!')
       } else {
-        // Nu trimitem email la fiecare task — doar actualizăm mesajul UI
         setMessage(`✅ Task completat! (Mai sunt ${remainingTasks} task-uri în job)`)
       }
         setTimeout(() => setMessage(null), 4000)
