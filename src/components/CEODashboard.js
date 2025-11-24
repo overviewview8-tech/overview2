@@ -17,6 +17,7 @@ export default function CEODashboard() {
   const [jobname, setJobname] = useState('')
   const [clientname, setClientname] = useState('')
   const [clientemail, setClientemail] = useState('')
+  const [clientPhone, setClientPhone] = useState('')
   const [jobPriority, setJobPriority] = useState('normal')
   const [clientFirstName, setClientFirstName] = useState('')
   const [clientLastName, setClientLastName] = useState('')
@@ -235,6 +236,7 @@ export default function CEODashboard() {
         name: jobname,
         priority: jobPriority || 'normal',
         client_name: fullClientName,
+        client_phone: clientPhone || null,
         client_first_name: clientFirstName || null,
         client_last_name: clientLastName || null,
         client_id_series: clientIdSeries || null,
@@ -301,6 +303,7 @@ export default function CEODashboard() {
       setClientCNP('')
       setClientAddress('')
       setClientemail('')
+      setClientPhone('')
       setJobValue('')
       setNewJobTasks([{ name: '', description: '', assigned_to: [], estimated_hours: '', value: '' }])
       setShowCreateWithTasks(false)
@@ -333,6 +336,7 @@ export default function CEODashboard() {
       name: job.name,
       priority: job.priority || 'normal',
       client_name: job.client_name,
+      client_phone: job.client_phone || '',
       client_first_name: job.client_first_name || '',
       client_last_name: job.client_last_name || '',
       client_id_series: job.client_id_series || '',
@@ -357,6 +361,7 @@ export default function CEODashboard() {
       if (jobEdits.name !== undefined) updates.name = jobEdits.name
       if (jobEdits.client_name !== undefined) updates.client_name = jobEdits.client_name
       if (jobEdits.client_email !== undefined) updates.client_email = jobEdits.client_email || null
+      if (jobEdits.client_phone !== undefined) updates.client_phone = jobEdits.client_phone || null
       if (jobEdits.status !== undefined) updates.status = jobEdits.status
       if (jobEdits.total_value !== undefined) {
         updates.total_value = jobEdits.total_value !== '' && jobEdits.total_value != null ? parseFloat(jobEdits.total_value) : 0
@@ -1076,6 +1081,7 @@ export default function CEODashboard() {
                 <input placeholder="CNP" value={clientCNP} onChange={e => setClientCNP(e.target.value)} style={{ marginTop: 6 }} />
                 <input placeholder="Adresa" value={clientAddress} onChange={e => setClientAddress(e.target.value)} style={{ marginTop: 6 }} />
                 <input type="email" placeholder="Client Email" value={clientemail} onChange={e => setClientemail(e.target.value)} />
+                <input placeholder="Client Telefon" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
                 <input type="number" placeholder="Valoare job (lei)" value={jobValue} onChange={e => setJobValue(e.target.value)} step="0.01" min="0" />
               </div>
 
@@ -1183,6 +1189,7 @@ export default function CEODashboard() {
                 <div style={{ marginTop: 8, paddingLeft: 16, borderLeft: '3px solid #4CAF50' }}>
                   <div style={{ fontSize: 12, color: '#555', marginBottom: 8 }}>
                     <div>Client Email: {job.client_email || 'N/A'}</div>
+                    <div>Client Telefon: {job.client_phone || 'N/A'}</div>
                     <div>Created at: {new Date(job.created_at).toLocaleString('ro-RO')}</div>
                   </div>
 

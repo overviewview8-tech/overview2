@@ -17,6 +17,7 @@ const AdminDashboard = () => {
   const [jobname, setJobname] = useState('')
   const [clientname, setClientname] = useState('')
   const [clientemail, setClientemail] = useState('')
+  const [clientPhone, setClientPhone] = useState('')
   const [jobPriority, setJobPriority] = useState('normal')
   const [jobValue, setJobValue] = useState('')
   const [clientFirstName, setClientFirstName] = useState('')
@@ -188,6 +189,7 @@ const AdminDashboard = () => {
         name: jobname,
         priority: jobPriority || 'normal',
         client_name: fullClientName,
+        client_phone: clientPhone || null,
         client_first_name: clientFirstName || null,
         client_last_name: clientLastName || null,
         client_id_series: clientIdSeries || null,
@@ -196,7 +198,7 @@ const AdminDashboard = () => {
         client_email: clientemail || null,
         status: 'todo',
         created_by: user.id,
-        total_value: 0
+        total_value: jobValue ? parseFloat(jobValue) : 0
       }]).select()
       if (jobErr) throw jobErr
 
@@ -250,6 +252,7 @@ const AdminDashboard = () => {
       setClientCNP('')
       setClientAddress('')
       setClientemail('')
+      setClientPhone('')
       setNewJobTasks([{ name: '', description: '', assigned_to: [], estimated_hours: '' }])
       setShowCreateWithTasks(false)
       setMessage('✅ Job și taskuri create!')
@@ -286,6 +289,7 @@ const AdminDashboard = () => {
       name: job.name,
       priority: job.priority || 'normal',
       client_name: job.client_name || '',
+      client_phone: job.client_phone || '',
       client_first_name: job.client_first_name || '',
       client_last_name: job.client_last_name || '',
       client_id_series: job.client_id_series || '',
@@ -310,9 +314,15 @@ const AdminDashboard = () => {
       if (jobEdits.name !== undefined) updates.name = jobEdits.name
       if (jobEdits.client_name !== undefined) updates.client_name = jobEdits.client_name
       if (jobEdits.client_email !== undefined) updates.client_email = jobEdits.client_email || null
+      if (jobEdits.client_phone !== undefined) updates.client_phone = jobEdits.client_phone || null
       if (jobEdits.status !== undefined) updates.status = jobEdits.status
       /* Admin is not allowed to manually edit job total here; total_value is
          calculated from task values and updated automatically. */
+      // Allow admins to set/override job total_value manually when editing
+      // (will be persisted to `jobs.total_value`). Note: task updates still
+      // recalculate total_value based on task.value and may overwrite this
+      // manual value if tasks are edited afterwards.
+      if (jobEdits.total_value !== undefined) updates.total_value = jobEdits.total_value !== '' ? parseFloat(jobEdits.total_value) : null
       if (jobEdits.client_first_name !== undefined) updates.client_first_name = jobEdits.client_first_name || null
       if (jobEdits.client_last_name !== undefined) updates.client_last_name = jobEdits.client_last_name || null
       if (jobEdits.priority !== undefined) updates.priority = jobEdits.priority || 'normal'
@@ -1054,7 +1064,14 @@ const AdminDashboard = () => {
                 <input placeholder="CNP" value={clientCNP} onChange={e => setClientCNP(e.target.value)} style={{ marginTop: 6 }} />
                 <input placeholder="Adresa" value={clientAddress} onChange={e => setClientAddress(e.target.value)} style={{ marginTop: 6 }} />
                 <input type="email" placeholder="Client Email" value={clientemail} onChange={e => setClientemail(e.target.value)} />
-                {/* Job value is managed automatically from task values; hidden in Admin UI */}
+                <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
+                  <label style={{ fontSize: 12 }}>Telefon Client (opțional):</label>
+                  <input placeholder="Telefon" value={clientPhone} onChange={e => setClientPhone(e.target.value)} style={{ width: 160, padding: 6 }} />
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
+                  <label style={{ fontSize: 12 }}>Valoare Job (opțional):</label>
+                  <input type="number" step="0.01" placeholder="Valoare totală" value={jobValue} onChange={e => setJobValue(e.target.value)} style={{ width: 160, padding: 6 }} />
+                </div>
               </div>
 
               <div style={{ marginTop: 8, borderTop: '1px dashed #ddd', paddingTop: 8 }}>
@@ -1071,7 +1088,7 @@ const AdminDashboard = () => {
                         <label style={{ fontSize: 12 }}>Ore:</label>
                         <input type="number" placeholder="Ore" value={t.estimated_hours} onChange={e => updateNewJobTaskField(i, 'estimated_hours', e.target.value)} style={{ width: 96, padding: 6 }} step="0.5" min="0" />
                       </div>
-                      {/* Admin should not set task value; values are managed from CEO or task calculations */}
+                      {/* Admin: task value input removed on purpose */}
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 200 }}>
@@ -1137,12 +1154,28 @@ const AdminDashboard = () => {
                     onChange={e => setJobEdits(prev => ({ ...prev, client_email: e.target.value }))}
                     style={{ marginRight: 8 }}
                   />
+                  <input
+                    placeholder="Telefon Client"
+                    value={jobEdits.client_phone || ''}
+                    onChange={e => setJobEdits(prev => ({ ...prev, client_phone: e.target.value }))}
+                    style={{ marginRight: 8 }}
+                  />
                   <select value={jobEdits.priority || 'normal'} onChange={e => setJobEdits(prev => ({ ...prev, priority: e.target.value }))} style={{ marginRight: 8 }}>
                     <option value="normal">Normal</option>
                     <option value="repede">Repede</option>
                     <option value="urgent">Urgent</option>
                   </select>
-                  {/* Admin cannot manually edit job total; it's calculated from task values */}
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
+                    <label style={{ fontSize: 12 }}>Valoare Job:</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Valoare totală"
+                      value={jobEdits.total_value != null ? jobEdits.total_value : ''}
+                      onChange={e => setJobEdits(prev => ({ ...prev, total_value: e.target.value }))}
+                      style={{ width: 120, padding: 6 }}
+                    />
+                  </div>
                   <select value={jobEdits.status || 'todo'} onChange={e => setJobEdits(prev => ({ ...prev, status: e.target.value }))} style={{ marginRight: 8 }}>
                     <option value="todo">Todo</option>
                     <option value="completed">Completed</option>
@@ -1177,6 +1210,7 @@ const AdminDashboard = () => {
                 <div style={{ marginTop: 8, paddingLeft: 16, borderLeft: '3px solid #4CAF50' }}>
                   <div style={{ fontSize: 12, color: '#555', marginBottom: 8 }}>
                     <div>Client Email: {job.client_email || 'N/A'}</div>
+                    <div>Client Telefon: {job.client_phone || 'N/A'}</div>
                     <div>Created at: {new Date(job.created_at).toLocaleString('ro-RO')}</div>
                   </div>
 
@@ -1214,6 +1248,7 @@ const AdminDashboard = () => {
                                 min="0"
                               />
                             </div>
+                            {/* Admin: task value editing removed */}
                             <select value={taskEdits.status || 'todo'} onChange={e => setTaskEdits(prev => ({ ...prev, status: e.target.value }))} style={{ marginRight: 8 }}>
                               <option value="todo">Todo</option>
                               <option value="completed">Completed</option>
@@ -1233,6 +1268,9 @@ const AdminDashboard = () => {
                                   Asignat: {assignedProfiles.length > 0 ? assignedProfiles.map(p => displayUserLabel(p)).join(', ') : '(Neasignat)'}
                                   {task.estimated_hours && (
                                     <span> | ⏱️ {formatDuration(task.estimated_hours)} → {formatEstimatedDate(task.estimated_hours)}</span>
+                                  )}
+                                  {task.value != null && (
+                                    <span> | 💰 Valoare: {parseFloat(task.value).toFixed(2)}</span>
                                   )}
                                 </div>
                               </div>
