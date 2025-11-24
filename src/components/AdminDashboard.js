@@ -713,6 +713,20 @@ const AdminDashboard = () => {
 
   const downloadPdfForJob = async (job) => {
     try {
+      // Try to assign a sequential order number via DB RPC. If it fails,
+      // fall back to any existing job.order_number or omit.
+      let assignedOrder = null
+      try {
+        const rpcRes = await supabase.rpc('assign_job_order', { p_job_id: job.id })
+        if (rpcRes && rpcRes.data != null) {
+          // rpc may return scalar or array; handle both
+          if (Array.isArray(rpcRes.data)) assignedOrder = rpcRes.data[0]
+          else assignedOrder = rpcRes.data
+        }
+      } catch (rpcErr) {
+        console.warn('assign_job_order RPC failed', rpcErr)
+      }
+
       const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
       const pdfData = {
@@ -728,7 +742,8 @@ const AdminDashboard = () => {
         tasks: jobTasks,
         totalValue,
         completedAt: job.completed_at || new Date().toISOString(),
-        receptionNumber: job.reception_number || job.receptionNumber || null
+        receptionNumber: job.reception_number || job.receptionNumber || null,
+        orderNumber: assignedOrder != null ? assignedOrder : (job.order_number || null)
       }
       // generate client-side and download
       const { generateAndDownloadPdf } = await import('../utils/generatePdfClient')
@@ -1085,7 +1100,7 @@ const AdminDashboard = () => {
 
       <section>
         <h3>Joburi ({jobs.length})</h3>
-        {jobs.map(job => {
+        {jobs.map((job, idx) => {
           const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
           const totalHours = jobTasks.reduce((sum, t) => sum + (parseFloat(t.estimated_hours) || 0), 0)
           const isExpanded = expandedJob === job.id
@@ -1137,8 +1152,8 @@ const AdminDashboard = () => {
                 </div>
               ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div>
-                    <strong>{job.name}</strong> - {job.client_name} ({job.status})
+                    <div>
+                    <strong style={{ marginRight: 8 }}>{idx + 1}. {job.name}</strong> - {job.client_name} ({job.status})
                     
                     <div style={{ fontSize: 11, color: '#666' }}>
                       ⏱️ Timp estimat: <strong>{formatDuration(totalHours)}</strong>

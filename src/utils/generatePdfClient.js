@@ -145,22 +145,139 @@ export async function generateAndDownloadPdf(pdfData) {
       return draw(label, value, merged)
     }
 
+    // Helpers to draw on an arbitrary page (used for page-2). These mirror drawWrapped/drawFieldAt
+    const drawWrappedOn = (page, label, value, opts = {}, pageWidth = width, pageHeight = height) => {
+      if (value === undefined || value === null || value === '') return
+      const size = opts.size || defaultFontSize
+      const x = (opts.x != null) ? opts.x : marginLeft
+      const y = (opts.y != null) ? opts.y : (pageHeight - 120)
+      const availWidthTotal = (opts.width != null) ? opts.width : (opts.maxWidth != null ? opts.maxWidth : (pageWidth - marginLeft - 50))
+      const maxHeight = (opts.height != null) ? opts.height : (opts.maxHeight != null ? opts.maxHeight : (lineHeight * 4))
+
+      const labelText = label ? `${label} ` : ''
+      const labelWidth = helvetica.widthOfTextAtSize(labelText, size)
+      if (labelText) page.drawText(labelText, { x, y, size, font: helvetica, color: rgb(0, 0, 0) })
+
+      const availWidth = Math.max(20, availWidthTotal - labelWidth)
+      const words = String(value).split(/\s+/)
+      const lines = []
+      let line = ''
+      for (const w of words) {
+        const test = line ? `${line} ${w}` : w
+        const wWidth = helvetica.widthOfTextAtSize(test, size)
+        if (wWidth <= availWidth) {
+          line = test
+        } else {
+          if (line) lines.push(line)
+          line = w
+        }
+      }
+      if (line) lines.push(line)
+
+      const maxLines = Math.max(1, Math.floor(maxHeight / lineHeight))
+      let renderedLines = lines.slice(0, maxLines)
+      if (lines.length > maxLines) {
+        let last = renderedLines[renderedLines.length - 1]
+        while (helvetica.widthOfTextAtSize(`${last}...`, size) > availWidth && last.length > 0) last = last.slice(0, -1)
+        renderedLines[renderedLines.length - 1] = `${last}...`
+      }
+
+      const startX = x + labelWidth
+      for (let i = 0; i < renderedLines.length; i++) {
+        page.drawText(renderedLines[i], { x: startX, y: y - i * lineHeight, size, font: helvetica, color: rgb(0, 0, 0) })
+      }
+    }
+
+    const drawFieldOn = (page, fieldKey, label, value, defaultX = marginLeft, defaultY = null, defaultOpts = {}, pageWidth = width, pageHeight = height) => {
+      const boxes = pdfData && pdfData.fieldBoxes
+      const boxOpts = boxes && (boxes[fieldKey] || boxes[label])
+      const merged = Object.assign({}, defaultOpts, boxOpts || {})
+      if (merged.x == null) merged.x = defaultX
+      if (merged.y == null && defaultY != null) merged.y = defaultY
+
+      const noLabelGlobal = pdfData && pdfData.noLabels
+      if (noLabelGlobal) merged.noLabel = true
+
+      // special handling for clientSeries on a page
+      if (fieldKey === 'clientSeries' && value) {
+        const s = String(value)
+        const firstPart = s.slice(0, 2)
+        const restPart = s.length > 2 ? s.slice(-6) : ''
+        const part1X = merged.part1X != null ? merged.part1X : merged.x
+        const part1Y = merged.part1Y != null ? merged.part1Y : merged.y
+        const baseForOffset = (merged.part1X != null ? merged.part1X : merged.x)
+        const part2X = merged.part2X != null ? merged.part2X : (baseForOffset + (merged.part2Offset != null ? merged.part2Offset : 35))
+        const part2Y = merged.part2Y != null ? merged.part2Y : merged.y
+        const size = merged.size || defaultFontSize
+        if (!merged.noLabel && label) {
+          page.drawText(`${label} `, { x: part1X, y: part1Y, size, font: helvetica, color: rgb(0, 0, 0) })
+          const lw = helvetica.widthOfTextAtSize(`${label} `, size)
+          page.drawText(firstPart, { x: part1X + lw, y: part1Y, size, font: helvetica, color: rgb(0, 0, 0) })
+        } else {
+          page.drawText(firstPart, { x: part1X, y: part1Y, size, font: helvetica, color: rgb(0, 0, 0) })
+        }
+        if (restPart) page.drawText(restPart, { x: part2X, y: part2Y, size, font: helvetica, color: rgb(0, 0, 0) })
+        return
+      }
+
+      if (boxOpts) return drawWrappedOn(page, label, value, merged, pageWidth, pageHeight)
+      return page.drawText(label ? `${label} ${value}` : `${value}`, { x: merged.x, y: merged.y != null ? merged.y : (pageHeight - 120), size: merged.size || defaultFontSize, font: helvetica, color: rgb(0,0,0) })
+    }
+
+    // Like drawFieldAt but for a specific page: keeps same signature but draws on given page.
+    const drawFieldAtOn = (page, fieldKey, label, value, defaultX = marginLeft, defaultY = null, defaultOpts = {}, pageWidth = width, pageHeight = height) => {
+      return drawFieldOn(page, fieldKey, label, value, defaultX, defaultY, defaultOpts, pageWidth, pageHeight)
+    }
+
     // Use exact coordinates for our own keys (not fillTemplate keys).
     // Defaults can be overridden by entries in pdfData.fieldBoxes using the same keys.
     
 
     // Client fields (our keys)
+    // Order number (can be placed via pdfData.fieldBoxes.orderNumber)
+    drawFieldAt('orderNumber', '', pdfData.orderNumber || pdfData.order_number || '', width -485, height - 195, { width: 120, height: 18, size: defaultFontSize })
+    // Today's date (can be overridden via pdfData.todayDate or positioned via pdfData.fieldBoxes.todayDate)
+    const todayDateStrClient = (pdfData && (pdfData.todayDate || pdfData.today_date))
+      ? (pdfData.todayDate || pdfData.today_date)
+      : (() => {
+        const d = new Date()
+        const dd = String(d.getDate()).padStart(2, '0')
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const yyyy = d.getFullYear()
+        return `${dd}/${mm}/${yyyy}`
+      })()
+    drawFieldAt('todayDate', '/', todayDateStrClient, width - 470  , height - 195, { width: 220, height: 18, size: defaultFontSize })
     drawFieldAt('clientLastName', '', pdfData.clientLastName || pdfData.clientName || '', 190, height - 390, { width: 200, height: 18, size: defaultFontSize })
     drawFieldAt('clientFirstName', '', pdfData.clientFirstName || '', 250, height - 390, { width: 200, height: 18, size: defaultFontSize })
-    drawFieldAt('clientCNP', '', pdfData.clientCNP || pdfData.cnp || '', 380, height - 405, { width: 160, height: 18, size: defaultFontSize })
-    drawFieldAt('clientSeries', '', pdfData.clientSeries || pdfData.serie || '', 270, height - 405, { width: 100, height: 18, size: defaultFontSize })
-    drawFieldAt('clientAddress', '', pdfData.clientAddress || pdfData.address || '', 385, height - 390, { width: 300, height: 180, size: defaultFontSize })
+    drawFieldAt('clientCNP', '', pdfData.clientCNP || pdfData.cnp || '', 320, height - 440, { width: 160, height: 18, size: defaultFontSize })
+    drawFieldAt('clientSeries', '', pdfData.clientSeries || pdfData.serie || '', 190, height - 440, { width: 100, height: 18, size: defaultFontSize })
+    drawFieldAt('clientAddress', '', pdfData.clientAddress || pdfData.address || '', 150, height - 415, { width: 300, height: 180, size: defaultFontSize })
    
 
     // Representative and signatures
     
 
    
+
+    // Ensure there is a second page and draw job summary (job name + total value) on page 2
+    let pagesAfter = pdfDoc.getPages()
+    if (pagesAfter.length < 2) {
+      pdfDoc.addPage()
+      pagesAfter = pdfDoc.getPages()
+    }
+    const secondPage = pagesAfter[1]
+    const { width: w2, height: h2 } = secondPage.getSize()
+    const page2Box = (pdfData && pdfData.fieldBoxes && pdfData.fieldBoxes.page2) || {}
+    const page2X = (page2Box.x != null) ? page2Box.x : marginLeft
+    const page2Y = (page2Box.y != null) ? page2Box.y : (h2 - 80)
+    const page2Size = (page2Box.size != null) ? Number(page2Box.size) : defaultFontSize
+    const jobNameText = pdfData.jobName || pdfData.job_name || ''
+    const totalValueText = (pdfData.totalValue != null) ? (parseFloat(pdfData.totalValue).toFixed(2) + ' lei') : (pdfData.total_value != null ? (parseFloat(pdfData.total_value).toFixed(2) + ' lei') : '')
+
+    // Draw job name and total value on page 2 using drawFieldAt-like API.
+    // Using placeholder coordinates (you will set exact coords via pdfData.fieldBoxes)
+    drawFieldAtOn(secondPage, 'jobName', '-', jobNameText, 75, 315, { size: page2Size }, w2, h2)
+    drawFieldAtOn(secondPage, 'totalValue', '', totalValueText, 250, 287 , { size: page2Size }, w2, h2)
 
     const uint8Array = await pdfDoc.save()
     const blob = new Blob([uint8Array], { type: 'application/pdf' })

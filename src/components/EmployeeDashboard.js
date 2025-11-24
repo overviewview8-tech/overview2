@@ -492,6 +492,17 @@ const EmployeeDashboard = () => {
 
   const downloadPdfForJob = async (job) => {
     try {
+      let assignedOrder = null
+      try {
+        const rpcRes = await supabase.rpc('assign_job_order', { p_job_id: job.id })
+        if (rpcRes && rpcRes.data != null) {
+          if (Array.isArray(rpcRes.data)) assignedOrder = rpcRes.data[0]
+          else assignedOrder = rpcRes.data
+        }
+      } catch (rpcErr) {
+        console.warn('assign_job_order RPC failed', rpcErr)
+      }
+
       const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
       const pdfData = {
@@ -507,7 +518,8 @@ const EmployeeDashboard = () => {
         tasks: jobTasks,
         totalValue,
         completedAt: job.completed_at || new Date().toISOString(),
-        receptionNumber: job.reception_number || job.receptionNumber || null
+        receptionNumber: job.reception_number || job.receptionNumber || null,
+        orderNumber: assignedOrder != null ? assignedOrder : (job.order_number || null)
       }
       const { generateAndDownloadPdf } = await import('../utils/generatePdfClient')
       const res = await generateAndDownloadPdf(pdfData)
@@ -546,7 +558,7 @@ const EmployeeDashboard = () => {
         {jobs.length === 0 ? (
           <p style={{ color: '#999' }}>Nu ai taskuri asignate momentan.</p>
         ) : (
-          jobs.map(job => {
+          jobs.map((job, idx) => {
             const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
             console.log(`📊 Job "${job.name}" (${job.id}):`)
             console.log('  - Tasks in state:', tasks.length)
@@ -560,7 +572,7 @@ const EmployeeDashboard = () => {
               <div key={job.id} style={{ marginBottom: 16, padding: 12, border: '1px solid #ccc', borderRadius: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div>
-                        <strong>📁 {job.name}</strong> - {job.client_name} ({job.status})
+                        <strong>📁 {idx + 1}. {job.name}</strong> - {job.client_name} ({job.status})
                         
                         <div style={{ fontSize: 12, color: '#333' }}>💰 Valoare job: {job.total_value != null ? parseFloat(job.total_value).toFixed(2) + ' lei' : 'N/A'}</div>
                     <div style={{ fontSize: 11, color: '#666' }}>

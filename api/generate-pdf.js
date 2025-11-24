@@ -44,12 +44,12 @@ module.exports = async (req, res) => {
       const pages = pdfDoc.getPages()
       const firstPage = pages[0]
       const { width, height } = firstPage.getSize()
-      const helvetica = await pdfDoc.embedFont(pdfLibStandardFonts.Helvetica)
-
-      const marginLeft = 50
-      let currentY = height - 120
-        // global/default font size (can be overridden per-field via pdfData.fieldBoxes[...].size)
-        const defaultFontSize = (pdfData && pdfData.fontSize) ? Number(pdfData.fontSize) : 12
+          if (value === undefined || value === null || value === '') return
+          const size = (opts.size != null) ? opts.size : defaultFontSize
+          const x = (opts.x != null) ? opts.x : marginLeft
+          const y = (opts.y != null) ? opts.y : currentY
+          firstPage.drawText(`${label ? label + ' ' : ''}${value}`, { x, y, size, font: helvetica, color: pdfLibRgb(0, 0, 0) })
+          if (opts.y == null) currentY -= lineHeight
         const lineHeight = Math.max(12, Math.round(defaultFontSize * 1.6))
 
       // draw simple single-line label + value
@@ -111,6 +111,85 @@ module.exports = async (req, res) => {
           firstPage.drawText(renderedLines[i], { x: startX, y: y - i * lineHeight, size, font: helvetica, color: pdfLibRgb(0, 0, 0) })
         }
         if (opts.y == null) currentY -= Math.max(lineHeight, renderedLines.length * lineHeight)
+      }
+
+      // Helpers to draw on an arbitrary page (page-2). Mirrors drawWrapped/drawField semantics.
+      const drawWrappedOn = (page, label, value, opts = {}, pageWidth = width, pageHeight = height) => {
+        if (value === undefined || value === null || value === '') return
+        const size = (opts.size != null) ? opts.size : defaultFontSize
+        const x = (opts.x != null) ? opts.x : marginLeft
+        const y = (opts.y != null) ? opts.y : (pageHeight - 120)
+        const availWidthTotal = (opts.width != null) ? opts.width : (opts.maxWidth != null ? opts.maxWidth : (pageWidth - marginLeft - 50))
+        const maxHeight = (opts.height != null) ? opts.height : (opts.maxHeight != null ? opts.maxHeight : (lineHeight * 4))
+
+        const labelText = label ? `${label} ` : ''
+        const labelWidth = helvetica.widthOfTextAtSize(labelText, size)
+        if (labelText) page.drawText(labelText, { x, y, size, font: helvetica, color: pdfLibRgb(0,0,0) })
+
+        const availWidth = Math.max(20, availWidthTotal - labelWidth)
+        const words = String(value).split(/\s+/)
+        const lines = []
+        let line = ''
+        for (const w of words) {
+          const test = line ? `${line} ${w}` : w
+          const wWidth = helvetica.widthOfTextAtSize(test, size)
+          if (wWidth <= availWidth) {
+            line = test
+          } else {
+            if (line) lines.push(line)
+            line = w
+          }
+        }
+        if (line) lines.push(line)
+
+        const maxLines = Math.max(1, Math.floor(maxHeight / lineHeight))
+        let renderedLines = lines.slice(0, maxLines)
+        if (lines.length > maxLines) {
+          let last = renderedLines[renderedLines.length - 1]
+          while (helvetica.widthOfTextAtSize(`${last}...`, size) > availWidth && last.length > 0) {
+            last = last.slice(0, -1)
+          }
+          renderedLines[renderedLines.length - 1] = `${last}...`
+        }
+
+        const startX = x + labelWidth
+        for (let i = 0; i < renderedLines.length; i++) {
+          page.drawText(renderedLines[i], { x: startX, y: y - i * lineHeight, size, font: helvetica, color: pdfLibRgb(0,0,0) })
+        }
+      }
+
+      const drawFieldOn = (page, fieldKey, label, value, defaultX = marginLeft, defaultY = null, defaultOpts = {}, pageWidth = width, pageHeight = height) => {
+        const boxes = pdfData && pdfData.fieldBoxes
+        const boxOpts = boxes && (boxes[fieldKey] || boxes[label])
+        const merged = Object.assign({}, defaultOpts, boxOpts || {})
+        if (merged.x == null) merged.x = defaultX
+        if (merged.y == null && defaultY != null) merged.y = defaultY
+        if (pdfData && pdfData.noLabels) merged.noLabel = true
+
+        // special handling for clientSeries
+        if (fieldKey === 'clientSeries' && value) {
+          const s = String(value)
+          const firstPart = s.slice(0, 2)
+          const restPart = s.length > 2 ? s.slice(-6) : ''
+          const part1X = (merged.part1X != null) ? merged.part1X : ((merged.x != null) ? merged.x : marginLeft)
+          const part1Y = (merged.part1Y != null) ? merged.part1Y : ((merged.y != null) ? merged.y : currentY)
+          const baseForOffset = part1X
+          const part2X = merged.part2X != null ? merged.part2X : (baseForOffset + (merged.part2Offset != null ? merged.part2Offset : 50))
+          const part2Y = (merged.part2Y != null) ? merged.part2Y : ((merged.y != null) ? merged.y : currentY)
+          const size = merged.size || defaultFontSize
+          if (!merged.noLabel && label) {
+            page.drawText(`${label} `, { x: part1X, y: part1Y, size, font: helvetica, color: pdfLibRgb(0,0,0) })
+            const lw = helvetica.widthOfTextAtSize(`${label} `, size)
+            page.drawText(firstPart, { x: part1X + lw, y: part1Y, size, font: helvetica, color: pdfLibRgb(0,0,0) })
+          } else {
+            page.drawText(firstPart, { x: part1X, y: part1Y, size, font: helvetica, color: pdfLibRgb(0,0,0) })
+          }
+          if (restPart) page.drawText(restPart, { x: part2X, y: part2Y, size, font: helvetica, color: pdfLibRgb(0,0,0) })
+          return
+        }
+
+        if (boxOpts) return drawWrappedOn(page, label, value, boxOpts, pageWidth, pageHeight)
+        return page.drawText(`${label ? label + ' ' : ''}${value}`, { x: merged.x, y: (merged.y != null) ? merged.y : (pageHeight - 120), size: (merged.size != null) ? merged.size : defaultFontSize, font: helvetica, color: pdfLibRgb(0,0,0) })
       }
 
         // drawField chooses wrapped or simple rendering based on pdfData.fieldBoxes
