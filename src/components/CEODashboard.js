@@ -1060,7 +1060,7 @@ export default function CEODashboard() {
               <div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input placeholder="Job Name" value={jobname} onChange={e => setJobname(e.target.value)} required style={{ flex: '1 1 auto' }} />
-                  <select value={jobPriority} onChange={e => setJobPriority(e.target.value)} style={{ padding: 6 }}>
+                  <select value={jobPriority} onChange={e => setJobPriority(e.target.value)} style={{ padding: 6, width: 140, minWidth: 120 }}>
                     <option value="normal">Normal</option>
                     <option value="repede">Repede</option>
                     <option value="urgent">Urgent</option>
@@ -1141,7 +1141,7 @@ export default function CEODashboard() {
                   <input placeholder="CNP" value={jobEdits.client_cnp || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_cnp: e.target.value }))} style={{ marginTop: 6 }} />
                   <input placeholder="Adresa" value={jobEdits.client_address || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_address: e.target.value }))} style={{ marginTop: 6 }} />
                   <input type="email" placeholder="Email Client" value={jobEdits.client_email || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_email: e.target.value }))} style={{ marginRight: 8, marginTop: 6 }} />
-                  <select value={jobEdits.priority || 'normal'} onChange={e => setJobEdits(prev => ({ ...prev, priority: e.target.value }))} style={{ marginRight: 8, marginTop: 6, padding: 6 }}>
+                  <select value={jobEdits.priority || 'normal'} onChange={e => setJobEdits(prev => ({ ...prev, priority: e.target.value }))} style={{ marginRight: 8, marginTop: 6, padding: 6, width: 140, minWidth: 120 }}>
                     <option value="normal">Normal</option>
                     <option value="repede">Repede</option>
                     <option value="urgent">Urgent</option>

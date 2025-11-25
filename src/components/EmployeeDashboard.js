@@ -89,6 +89,13 @@ const EmployeeDashboard = () => {
         return { ...t, assigned_to: assigned, assigned_to_emails: assignedEmails }
       })
 
+      // Ensure a stable creation order: sort all tasks by created_at ascending
+      allTasks.sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+        return ta - tb
+      })
+
       // FILTRARE PENTRU EMPLOYEE:
       // 1. Găsește joburile unde are taskuri asignate SAU taskuri neasignate
       const myRelevantJobIds = [...new Set(
@@ -103,7 +110,15 @@ const EmployeeDashboard = () => {
       const myJobs = (jobsRes.data || []).filter(j => myRelevantJobIds.includes(j.id))
       
       // 3. Afișează TOATE taskurile din acele joburi (nu doar cele asignate lui)
+      // Keep tasks in creation order for employee view
       const myJobTasks = allTasks.filter(t => myRelevantJobIds.includes(t.job_id))
+
+      // As a safety, sort tasks for the job by creation time (ascending)
+      myJobTasks.sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+        return ta - tb
+      })
       
       console.log('📁 My Jobs:', myJobs.map(j => ({ id: j.id, name: j.name })))
       console.log('📋 All Tasks from DB:', allTasks.length)
@@ -202,6 +217,12 @@ const EmployeeDashboard = () => {
       // Actualizează lista de task-uri
       const updatedTask = data[0]
       const updatedTasks = tasks.map(t => t.id === task.id ? updatedTask : t)
+      // preserve creation order after update
+      updatedTasks.sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+        return ta - tb
+      })
       setTasks(updatedTasks)
 
       // find the job related to this task

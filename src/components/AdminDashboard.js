@@ -1043,7 +1043,7 @@ const AdminDashboard = () => {
               <div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input placeholder="Job Name" value={jobname} onChange={e => setJobname(e.target.value)} required />
-                  <select value={jobPriority} onChange={e => setJobPriority(e.target.value)} style={{ padding: 6 }}>
+                  <select value={jobPriority} onChange={e => setJobPriority(e.target.value)} style={{ padding: 6, width: 140, minWidth: 120 }}>
                     <option value="normal">Normal</option>
                     <option value="repede">Repede</option>
                     <option value="urgent">Urgent</option>
@@ -1152,7 +1152,7 @@ const AdminDashboard = () => {
                     onChange={e => setJobEdits(prev => ({ ...prev, client_phone: e.target.value }))}
                     style={{ marginRight: 8 }}
                   />
-                  <select value={jobEdits.priority || 'normal'} onChange={e => setJobEdits(prev => ({ ...prev, priority: e.target.value }))} style={{ marginRight: 8 }}>
+                  <select value={jobEdits.priority || 'normal'} onChange={e => setJobEdits(prev => ({ ...prev, priority: e.target.value }))} style={{ marginRight: 8, width: 140, minWidth: 120 }}>
                     <option value="normal">Normal</option>
                     <option value="repede">Repede</option>
                     <option value="urgent">Urgent</option>
