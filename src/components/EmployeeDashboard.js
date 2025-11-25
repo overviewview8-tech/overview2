@@ -214,7 +214,7 @@ const EmployeeDashboard = () => {
         const taskRecipients = Array.from(new Set([...(job && job.client_email ? [job.client_email] : []), ...assignedEmails, userProfile?.email].filter(Boolean)))
 
         if (taskRecipients.length > 0) {
-          const taskEmailRes = await sendTaskCompletionEmail({
+          await sendTaskCompletionEmail({
             to: taskRecipients,
             clientName: job ? job.client_name : null,
             jobName: job ? job.name : null,
@@ -223,7 +223,6 @@ const EmployeeDashboard = () => {
             taskValue: updatedTask.value,
             completedAt: updatedTask.completed_at
           })
-          console.log('Task email send result (employee):', taskEmailRes)
         }
       } catch (err) {
         console.warn('Task email failed', err)
@@ -256,7 +255,7 @@ const EmployeeDashboard = () => {
         // send job-level email
         try {
           if (jobRecipients.length > 0) {
-            const jobEmailRes = await sendJobCompletionEmail({
+            const res = await sendJobCompletionEmail({
               to: jobRecipients,
               clientName: job.client_name,
               jobName: job.name,
@@ -269,8 +268,7 @@ const EmployeeDashboard = () => {
               clientSeries: job.client_id_series,
               clientAddress: job.client_address
             })
-            console.log('Job email send result (employee):', jobEmailRes)
-            if (jobEmailRes && !jobEmailRes.ok) console.warn('⚠️ Job email failed', jobEmailRes)
+            if (res && !res.ok) console.warn('⚠️ Job email failed', res)
           }
         } catch (err) {
           console.error('Job email error', err)
