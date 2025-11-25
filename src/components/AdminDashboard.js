@@ -200,7 +200,10 @@ const AdminDashboard = () => {
 
       const jobId = newJob[0].id
       const filteredTasks = newJobTasks.filter(t => t.name && t.name.trim())
-      const tasksToInsert = filteredTasks.map(t => ({
+      // Preserve client-side creation order for tasks inserted in bulk by
+      // setting explicit incremental `created_at` timestamps (1ms increments).
+      const baseCreatedAt = Date.now()
+      const tasksToInsert = filteredTasks.map((t, i) => ({
         job_id: jobId,
         name: t.name,
         description: t.description || null,
@@ -212,7 +215,8 @@ const AdminDashboard = () => {
         estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
         value: null,
         deadline: t.deadline ? (new Date(t.deadline)).toISOString() : null,
-        created_by: user.id
+        created_by: user.id,
+        created_at: new Date(baseCreatedAt + i).toISOString()
       }))
 
       // Safe insert: try inserting as-is (with arrays). If the DB still

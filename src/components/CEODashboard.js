@@ -245,20 +245,23 @@ export default function CEODashboard() {
       if (jobErr) throw jobErr
 
       const jobId = newJob[0].id
+          // Preserve insertion order by assigning incremental created_at timestamps
+          const baseCreatedAt = Date.now()
           const tasksToInsert = newJobTasks
-        .filter(t => t.name && t.name.trim())
-        .map(t => ({
-          job_id: jobId,
-          name: t.name,
-          description: t.description || null,
-          status: 'todo',
-          assigned_to: Array.isArray(t.assigned_to) ? (t.assigned_to.length > 0 ? t.assigned_to : null) : (t.assigned_to ? [t.assigned_to] : null),
-          assigned_to_emails: null,
-          estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
-              value: t.value ? parseFloat(t.value) : null,
-              deadline: t.deadline ? (new Date(t.deadline)).toISOString() : null,
-          created_by: user?.id || null
-        }))
+            .filter(t => t.name && t.name.trim())
+            .map((t, i) => ({
+              job_id: jobId,
+              name: t.name,
+              description: t.description || null,
+              status: 'todo',
+              assigned_to: Array.isArray(t.assigned_to) ? (t.assigned_to.length > 0 ? t.assigned_to : null) : (t.assigned_to ? [t.assigned_to] : null),
+              assigned_to_emails: null,
+              estimated_hours: t.estimated_hours ? parseFloat(t.estimated_hours) : null,
+                  value: t.value ? parseFloat(t.value) : null,
+                  deadline: t.deadline ? (new Date(t.deadline)).toISOString() : null,
+              created_by: user?.id || null,
+              created_at: new Date(baseCreatedAt + i).toISOString()
+            }))
 
       if (tasksToInsert.length > 0) {
         // Safe insert with retry when DB still has scalar `assigned_to`.
