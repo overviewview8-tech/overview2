@@ -262,8 +262,6 @@ const EmployeeDashboard = () => {
               tasks: jobTasks,
               totalValue,
               completedAt,
-              clientFirstName: job.client_first_name,
-              clientLastName: job.client_last_name,
               clientCNP: job.client_cnp,
               clientSeries: job.client_id_series,
               clientAddress: job.client_address
@@ -544,8 +542,6 @@ const EmployeeDashboard = () => {
       const pdfData = {
         template: 'blank',
         clientName: job.client_name,
-        clientFirstName: job.client_first_name || null,
-        clientLastName: job.client_last_name || null,
         clientCNP: job.client_cnp || null,
         clientSeries: job.client_id_series || null,
         clientAddress: job.client_address || null,

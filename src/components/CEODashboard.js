@@ -19,8 +19,6 @@ export default function CEODashboard() {
   const [clientemail, setClientemail] = useState('')
   const [clientPhone, setClientPhone] = useState('')
   const [jobPriority, setJobPriority] = useState('normal')
-  const [clientFirstName, setClientFirstName] = useState('')
-  const [clientLastName, setClientLastName] = useState('')
   const [clientIdSeries, setClientIdSeries] = useState('')
   const [clientCNP, setClientCNP] = useState('')
   const [clientAddress, setClientAddress] = useState('')
@@ -118,8 +116,6 @@ export default function CEODashboard() {
       const pdfData = {
         template: 'blank',
         clientName: job.client_name,
-        clientFirstName: job.client_first_name || null,
-        clientLastName: job.client_last_name || null,
         clientCNP: job.client_cnp || null,
         clientSeries: job.client_id_series || null,
         clientAddress: job.client_address || null,
@@ -230,15 +226,14 @@ export default function CEODashboard() {
     setLoading(true)
     setError(null)
     try {
-      const fullClientName = (clientFirstName || clientLastName) ? `${clientFirstName || ''} ${clientLastName || ''}`.trim() : clientname
+      const fullClientName = clientname || ''
 
       const { data: newJob, error: jobErr } = await supabase.from('jobs').insert([{
         name: jobname,
         priority: jobPriority || 'normal',
         client_name: fullClientName,
         client_phone: clientPhone || null,
-        client_first_name: clientFirstName || null,
-        client_last_name: clientLastName || null,
+        // legacy first/last removed; frontend uses client_name only
         client_id_series: clientIdSeries || null,
         client_cnp: clientCNP || null,
         client_address: clientAddress || null,
@@ -298,8 +293,6 @@ export default function CEODashboard() {
       setJobname('')
       setClientname('')
       setJobPriority('normal')
-      setClientFirstName('')
-      setClientLastName('')
       setClientIdSeries('')
       setClientCNP('')
       setClientAddress('')
@@ -338,8 +331,6 @@ export default function CEODashboard() {
       priority: job.priority || 'normal',
       client_name: job.client_name,
       client_phone: job.client_phone || '',
-      client_first_name: job.client_first_name || '',
-      client_last_name: job.client_last_name || '',
       client_id_series: job.client_id_series || '',
       client_cnp: job.client_cnp || '',
       client_address: job.client_address || '',
@@ -367,8 +358,7 @@ export default function CEODashboard() {
       if (jobEdits.total_value !== undefined) {
         updates.total_value = jobEdits.total_value !== '' && jobEdits.total_value != null ? parseFloat(jobEdits.total_value) : 0
       }
-      if (jobEdits.client_first_name !== undefined) updates.client_first_name = jobEdits.client_first_name || null
-      if (jobEdits.client_last_name !== undefined) updates.client_last_name = jobEdits.client_last_name || null
+      // legacy first/last not used by frontend
       if (jobEdits.priority !== undefined) updates.priority = jobEdits.priority || 'normal'
       if (jobEdits.client_id_series !== undefined) updates.client_id_series = jobEdits.client_id_series || null
       if (jobEdits.client_cnp !== undefined) updates.client_cnp = jobEdits.client_cnp || null
@@ -583,8 +573,6 @@ export default function CEODashboard() {
                 tasks: jobTasks,
                 totalValue,
                 completedAt,
-                clientFirstName: job.client_first_name,
-                clientLastName: job.client_last_name,
                 clientCNP: job.client_cnp,
                 clientSeries: job.client_id_series,
                 clientAddress: job.client_address,
@@ -1079,10 +1067,7 @@ export default function CEODashboard() {
                   </select>
                 </div>
                 <input placeholder="Client Name (full)" value={clientname} onChange={e => setClientname(e.target.value)} />
-                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                  <input placeholder="Client Prenume" value={clientFirstName} onChange={e => setClientFirstName(e.target.value)} style={{ flex: '1 1 150px' }} />
-                  <input placeholder="Client Nume" value={clientLastName} onChange={e => setClientLastName(e.target.value)} style={{ flex: '1 1 150px' }} />
-                </div>
+                {/* Using single `Client Name (full)` field - first/last inputs removed */}
                 <input placeholder="Serie buletin" value={clientIdSeries} onChange={e => setClientIdSeries(e.target.value)} style={{ marginTop: 6 }} />
                 <input placeholder="CNP" value={clientCNP} onChange={e => setClientCNP(e.target.value)} style={{ marginTop: 6 }} />
                 <input placeholder="Adresa" value={clientAddress} onChange={e => setClientAddress(e.target.value)} style={{ marginTop: 6 }} />
@@ -1151,10 +1136,7 @@ export default function CEODashboard() {
                 <div style={{ marginBottom: 8 }}>
                   <input placeholder="Nume Job" value={jobEdits.name || ''} onChange={e => setJobEdits(prev => ({ ...prev, name: e.target.value }))} style={{ marginRight: 8 }} />
                   <input placeholder="Nume Client (full)" value={jobEdits.client_name || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_name: e.target.value }))} style={{ marginRight: 8 }} />
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                    <input placeholder="Client Prenume" value={jobEdits.client_first_name || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_first_name: e.target.value }))} style={{ flex: '1 1 150px' }} />
-                    <input placeholder="Client Nume" value={jobEdits.client_last_name || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_last_name: e.target.value }))} style={{ flex: '1 1 150px' }} />
-                  </div>
+                  {/* legacy first/last removed - use single `client_name` instead */}
                   <input placeholder="Serie buletin" value={jobEdits.client_id_series || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_id_series: e.target.value }))} style={{ marginTop: 6 }} />
                   <input placeholder="CNP" value={jobEdits.client_cnp || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_cnp: e.target.value }))} style={{ marginTop: 6 }} />
                   <input placeholder="Adresa" value={jobEdits.client_address || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_address: e.target.value }))} style={{ marginTop: 6 }} />

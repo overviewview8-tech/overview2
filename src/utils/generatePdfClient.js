@@ -247,8 +247,8 @@ export async function generateAndDownloadPdf(pdfData) {
         return `${dd}/${mm}/${yyyy}`
       })()
     drawFieldAt('todayDate', '/', todayDateStrClient, width - 470  , height - 195, { width: 220, height: 18, size: defaultFontSize })
-    drawFieldAt('clientLastName', '', pdfData.clientLastName || pdfData.clientName || '', 190, height - 390, { width: 200, height: 18, size: defaultFontSize })
-    drawFieldAt('clientFirstName', '', pdfData.clientFirstName || '', 250, height - 390, { width: 200, height: 18, size: defaultFontSize })
+    // Use single clientName field (no separate first/last)
+    drawFieldAt('clientName', '', pdfData.clientName || pdfData.client_name || '', 190, height - 390, { width: 300, height: 18, size: defaultFontSize })
     drawFieldAt('clientCNP', '', pdfData.clientCNP || pdfData.cnp || '', 320, height - 440, { width: 160, height: 18, size: defaultFontSize })
     drawFieldAt('clientSeries', '', pdfData.clientSeries || pdfData.serie || '', 190, height - 440, { width: 100, height: 18, size: defaultFontSize })
     drawFieldAt('clientAddress', '', pdfData.clientAddress || pdfData.address || '', 150, height - 415, { width: 300, height: 180, size: defaultFontSize })
@@ -283,7 +283,7 @@ export async function generateAndDownloadPdf(pdfData) {
     const blob = new Blob([uint8Array], { type: 'application/pdf' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    const filenameBase = `${(pdfData.clientLastName || 'client').replace(/[^a-z0-9\-_\. ]/gi, '_')}_${(pdfData.jobName || 'job').replace(/[^a-z0-9\-_\. ]/gi, '_')}`
+    const filenameBase = `${((pdfData.clientName || pdfData.client_name || 'client')).replace(/[^a-z0-9\-_\. ]/gi, '_')}_${(pdfData.jobName || 'job').replace(/[^a-z0-9\-_\. ]/gi, '_')}`
     a.href = url
     a.download = `${filenameBase}_filled.pdf`
     document.body.appendChild(a)

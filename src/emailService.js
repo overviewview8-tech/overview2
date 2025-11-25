@@ -48,7 +48,7 @@ export async function sendTaskCompletionEmail({ to, clientName, jobName, taskNam
   return postSendEmail(payload)
 }
 
-export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt, clientCNP, clientSeries, clientAddress, clientFirstName, clientLastName, receptionNumber }, options = {}) {
+export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = [], totalValue, completedAt, clientCNP, clientSeries, clientAddress, receptionNumber }, options = {}) {
   if (!to) return { ok: false, error: 'No recipient' }
   const subject = `Înregistrare documentație cadastrală: ${jobName}`
   const completedStr = completedAt || new Date().toLocaleString()
@@ -71,8 +71,6 @@ export async function sendJobCompletionEmail({ to, clientName, jobName, tasks = 
     const pdfData = {
       template: 'blank',
       clientName,
-      clientFirstName: clientFirstName || null,
-      clientLastName: clientLastName || null,
       clientCNP: clientCNP || null,
       clientSeries: clientSeries || null,
       clientAddress: clientAddress || null,

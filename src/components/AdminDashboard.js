@@ -20,8 +20,6 @@ const AdminDashboard = () => {
   const [clientPhone, setClientPhone] = useState('')
   const [jobPriority, setJobPriority] = useState('normal')
   const [jobValue, setJobValue] = useState('')
-  const [clientFirstName, setClientFirstName] = useState('')
-  const [clientLastName, setClientLastName] = useState('')
   const [clientIdSeries, setClientIdSeries] = useState('')
   const [clientCNP, setClientCNP] = useState('')
   const [clientAddress, setClientAddress] = useState('')
@@ -183,15 +181,13 @@ const AdminDashboard = () => {
     setLoading(true)
     setError(null)
     try {
-      const fullClientName = (clientFirstName || clientLastName) ? `${clientFirstName || ''} ${clientLastName || ''}`.trim() : clientname
+        const fullClientName = clientname || ''
 
       const { data: newJob, error: jobErr } = await supabase.from('jobs').insert([{
         name: jobname,
         priority: jobPriority || 'normal',
         client_name: fullClientName,
         client_phone: clientPhone || null,
-        client_first_name: clientFirstName || null,
-        client_last_name: clientLastName || null,
         client_id_series: clientIdSeries || null,
         client_cnp: clientCNP || null,
         client_address: clientAddress || null,
@@ -247,8 +243,6 @@ const AdminDashboard = () => {
       setJobname('')
       setClientname('')
       setJobPriority('normal')
-      setClientFirstName('')
-      setClientLastName('')
       setClientIdSeries('')
       setClientCNP('')
       setClientAddress('')
@@ -291,8 +285,6 @@ const AdminDashboard = () => {
       priority: job.priority || 'normal',
       client_name: job.client_name || '',
       client_phone: job.client_phone || '',
-      client_first_name: job.client_first_name || '',
-      client_last_name: job.client_last_name || '',
       client_id_series: job.client_id_series || '',
       client_cnp: job.client_cnp || '',
       client_address: job.client_address || '',
@@ -324,8 +316,7 @@ const AdminDashboard = () => {
       // recalculate total_value based on task.value and may overwrite this
       // manual value if tasks are edited afterwards.
       if (jobEdits.total_value !== undefined) updates.total_value = jobEdits.total_value !== '' ? parseFloat(jobEdits.total_value) : null
-      if (jobEdits.client_first_name !== undefined) updates.client_first_name = jobEdits.client_first_name || null
-      if (jobEdits.client_last_name !== undefined) updates.client_last_name = jobEdits.client_last_name || null
+        // client_first_name and client_last_name are no longer updated
       if (jobEdits.priority !== undefined) updates.priority = jobEdits.priority || 'normal'
       if (jobEdits.client_id_series !== undefined) updates.client_id_series = jobEdits.client_id_series || null
       if (jobEdits.client_cnp !== undefined) updates.client_cnp = jobEdits.client_cnp || null
@@ -537,8 +528,7 @@ const AdminDashboard = () => {
               tasks: jobTasks,
               totalValue,
               completedAt,
-              clientFirstName: job.client_first_name,
-              clientLastName: job.client_last_name,
+              // legacy first/last removed; frontend uses clientName only
               clientCNP: job.client_cnp,
               clientSeries: job.client_id_series,
               clientAddress: job.client_address
@@ -748,8 +738,6 @@ const AdminDashboard = () => {
       const pdfData = {
         template: 'blank',
         clientName: job.client_name,
-        clientFirstName: job.client_first_name || null,
-        clientLastName: job.client_last_name || null,
         clientCNP: job.client_cnp || null,
         clientSeries: job.client_id_series || null,
         clientAddress: job.client_address || null,
@@ -1062,10 +1050,7 @@ const AdminDashboard = () => {
                   </select>
                 </div>
                 <input placeholder="Client Name (full)" value={clientname} onChange={e => setClientname(e.target.value)} />
-                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                  <input placeholder="Client Prenume" value={clientFirstName} onChange={e => setClientFirstName(e.target.value)} style={{ flex: '1 1 150px' }} />
-                  <input placeholder="Client Nume" value={clientLastName} onChange={e => setClientLastName(e.target.value)} style={{ flex: '1 1 150px' }} />
-                </div>
+                {/* removed separate first/last name inputs; use single Client Name field */}
                 <input placeholder="Serie buletin" value={clientIdSeries} onChange={e => setClientIdSeries(e.target.value)} style={{ marginTop: 6 }} />
                 <input placeholder="CNP" value={clientCNP} onChange={e => setClientCNP(e.target.value)} style={{ marginTop: 6 }} />
                 <input placeholder="Adresa" value={clientAddress} onChange={e => setClientAddress(e.target.value)} style={{ marginTop: 6 }} />
@@ -1150,10 +1135,7 @@ const AdminDashboard = () => {
                     style={{ marginRight: 8 }}
                   />
                   
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                    <input placeholder="Client Prenume" value={jobEdits.client_first_name || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_first_name: e.target.value }))} style={{ flex: '1 1 150px' }} />
-                    <input placeholder="Client Nume" value={jobEdits.client_last_name || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_last_name: e.target.value }))} style={{ flex: '1 1 150px' }} />
-                  </div>
+                  {/* removed legacy first/last edit inputs; use client_name only */}
                   <input placeholder="Serie buletin" value={jobEdits.client_id_series || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_id_series: e.target.value }))} style={{ marginTop: 6 }} />
                   <input placeholder="CNP" value={jobEdits.client_cnp || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_cnp: e.target.value }))} style={{ marginTop: 6 }} />
                   <input placeholder="Adresa" value={jobEdits.client_address || ''} onChange={e => setJobEdits(prev => ({ ...prev, client_address: e.target.value }))} style={{ marginTop: 6 }} />
