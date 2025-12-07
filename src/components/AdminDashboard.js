@@ -23,6 +23,7 @@ const AdminDashboard = () => {
   const [clientIdSeries, setClientIdSeries] = useState('')
   const [clientCNP, setClientCNP] = useState('')
   const [clientAddress, setClientAddress] = useState('')
+  const [orderNumber, setOrderNumber] = useState('')
   const [newJobTasks, setNewJobTasks] = useState([{ name: '', description: '', assigned_to: [], estimated_hours: '', deadline: '' }])
 
   // Stare pentru job expandat
@@ -194,7 +195,8 @@ const AdminDashboard = () => {
         client_email: clientemail || null,
         status: 'todo',
         created_by: user.id,
-        total_value: jobValue ? parseFloat(jobValue) : 0
+        total_value: jobValue ? parseFloat(jobValue) : 0,
+        order_number: orderNumber || null
       }]).select()
       if (jobErr) throw jobErr
 
@@ -288,6 +290,7 @@ const AdminDashboard = () => {
       name: job.name,
       priority: job.priority || 'normal',
       client_name: job.client_name || '',
+      order_number: job.order_number || '',
       client_phone: job.client_phone || '',
       client_id_series: job.client_id_series || '',
       client_cnp: job.client_cnp || '',
@@ -325,6 +328,7 @@ const AdminDashboard = () => {
       if (jobEdits.client_id_series !== undefined) updates.client_id_series = jobEdits.client_id_series || null
       if (jobEdits.client_cnp !== undefined) updates.client_cnp = jobEdits.client_cnp || null
       if (jobEdits.client_address !== undefined) updates.client_address = jobEdits.client_address || null
+      if (jobEdits.order_number !== undefined) updates.order_number = jobEdits.order_number || null
       // job-level description removed; task-level descriptions are used instead
 
       const { data, error: updErr } = await supabase.from('jobs').update(updates).eq('id', jobId).select()
@@ -661,8 +665,20 @@ const AdminDashboard = () => {
     setLoading(true)
     setError(null)
     try {
+      // Delete from profiles table
       const { error: delErr } = await supabase.from('profiles').delete().eq('id', profileId)
       if (delErr) throw delErr
+
+      // Delete user from Supabase Auth so email can be reused
+      try {
+        const { error: authErr } = await supabase.auth.admin.deleteUser(profileId)
+        if (authErr) {
+          console.warn('Failed to delete user from Auth (may require service_role key):', authErr)
+          // Don't fail the whole operation if auth delete fails
+        }
+      } catch (authError) {
+        console.warn('Auth delete error:', authError)
+      }
 
       setProfiles(prev => prev.filter(p => p.id !== profileId))
       setMessage('✅ Angajat șters cu succes!')
@@ -723,19 +739,8 @@ const AdminDashboard = () => {
 
   const downloadPdfForJob = async (job) => {
     try {
-      // Try to assign a sequential order number via DB RPC. If it fails,
-      // fall back to any existing job.order_number or omit.
-      let assignedOrder = null
-      try {
-        const rpcRes = await supabase.rpc('assign_job_order', { p_job_id: job.id })
-        if (rpcRes && rpcRes.data != null) {
-          // rpc may return scalar or array; handle both
-          if (Array.isArray(rpcRes.data)) assignedOrder = rpcRes.data[0]
-          else assignedOrder = rpcRes.data
-        }
-      } catch (rpcErr) {
-        console.warn('assign_job_order RPC failed', rpcErr)
-      }
+      // Use manually set order_number from job record (no auto-generation)
+      const orderNum = job.order_number || null
 
       const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
@@ -751,7 +756,7 @@ const AdminDashboard = () => {
         totalValue,
         completedAt: job.completed_at || new Date().toISOString(),
         receptionNumber: job.reception_number || job.receptionNumber || null,
-        orderNumber: assignedOrder != null ? assignedOrder : (job.order_number || null)
+        orderNumber: orderNum
       }
       // generate client-side and download
       const { generateAndDownloadPdf } = await import('../utils/generatePdfClient')
@@ -1066,6 +1071,10 @@ const AdminDashboard = () => {
                 <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
                   <label style={{ fontSize: 12 }}>Valoare Job (opțional):</label>
                   <input type="number" step="0.01" placeholder="Valoare totală" value={jobValue} onChange={e => setJobValue(e.target.value)} style={{ width: 160, padding: 6 }} />
+                                <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
+                                  <label style={{ fontSize: 12 }}>Număr Comandă (opțional):</label>
+                                  <input placeholder="Număr comandă" value={orderNumber} onChange={e => setOrderNumber(e.target.value)} style={{ width: 160, padding: 6 }} />
+                                </div>
                 </div>
               </div>
 
@@ -1172,6 +1181,15 @@ const AdminDashboard = () => {
                       style={{ width: 120, padding: 6 }}
                     />
                   </div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
+                    <label style={{ fontSize: 12 }}>Număr Comandă:</label>
+                    <input
+                      placeholder="Număr comandă"
+                      value={jobEdits.order_number || ''}
+                      onChange={e => setJobEdits(prev => ({ ...prev, order_number: e.target.value }))}
+                      style={{ width: 140, padding: 6 }}
+                    />
+                  </div>
                   <select value={jobEdits.status || 'todo'} onChange={e => setJobEdits(prev => ({ ...prev, status: e.target.value }))} style={{ marginRight: 8 }}>
                     <option value="todo">Todo</option>
                     <option value="completed">Completed</option>
@@ -1194,9 +1212,7 @@ const AdminDashboard = () => {
                       {isExpanded ? '🔼 Ascunde' : '🔽 Detalii'}
                     </button>
                     <button onClick={() => startEditJob(job)} style={{ fontSize: 12 }}>✏️ Editează</button>
-                    {(job.status === 'completed' || areAllTasksCompleted(tasks, job.id)) && (
-                      <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
-                    )}
+                    <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
                     <button onClick={() => deleteJob(job.id)} style={{ fontSize: 12, color: 'red' }}>🗑️ Șterge</button>
                   </div>
                 </div>
@@ -1272,11 +1288,17 @@ const AdminDashboard = () => {
                                 <div style={{ fontSize: 11, color: '#666' }}>
                                   Asignat: {assignedProfiles.length > 0 ? assignedProfiles.map(p => displayUserLabel(p)).join(', ') : '(Neasignat)'}
                                   {task.estimated_hours && (
-                                    <span> | ⏱️ {formatDuration(task.estimated_hours)} → {formatEstimatedDate(task.estimated_hours)}</span>
+                                    <span> | ⏱️ {formatDuration(task.estimated_hours)}</span>
+                                  )}
+                                  {task.deadline && (
+                                    <span> | 📅 Deadline: {new Date(task.deadline).toLocaleDateString('ro-RO')}</span>
                                   )}
                                   {task.value != null && (
                                     <span> | 💰 Valoare: {parseFloat(task.value).toFixed(2)}</span>
                                   )}
+                                </div>
+                                <div style={{ fontSize: 12, color: '#444', marginTop: 2 }}>
+                                  Descriere: {task.description || 'Nespecificat'}
                                 </div>
                               </div>
                               <div style={{ display: 'flex', gap: 4 }}>

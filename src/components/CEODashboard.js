@@ -23,6 +23,7 @@ export default function CEODashboard() {
   const [clientCNP, setClientCNP] = useState('')
   const [clientAddress, setClientAddress] = useState('')
   const [jobValue, setJobValue] = useState('')
+    const [orderNumber, setOrderNumber] = useState('')
   const [newJobTasks, setNewJobTasks] = useState([{ name: '', description: '', assigned_to: [], estimated_hours: '', value: '', deadline: '' }])
 
   // Job/task UI state
@@ -100,16 +101,8 @@ export default function CEODashboard() {
 
   const downloadPdfForJob = async (job) => {
     try {
-      let assignedOrder = null
-      try {
-        const rpcRes = await supabase.rpc('assign_job_order', { p_job_id: job.id })
-        if (rpcRes && rpcRes.data != null) {
-          if (Array.isArray(rpcRes.data)) assignedOrder = rpcRes.data[0]
-          else assignedOrder = rpcRes.data
-        }
-      } catch (rpcErr) {
-        console.warn('assign_job_order RPC failed', rpcErr)
-      }
+      // Use manually set order_number from job record (no auto-generation)
+      const orderNum = job.order_number || null
 
       const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
@@ -125,7 +118,7 @@ export default function CEODashboard() {
         totalValue,
         completedAt: job.completed_at || new Date().toISOString(),
         receptionNumber: job.reception_number || job.receptionNumber || null,
-        orderNumber: assignedOrder != null ? assignedOrder : (job.order_number || null)
+        orderNumber: orderNum
       }
 
       // generate client-side and download
@@ -137,6 +130,65 @@ export default function CEODashboard() {
     } catch (err) {
       console.error('downloadPdfForJob error', err)
       setError(err.message || 'Eroare la descarcare PDF')
+    }
+  }
+
+  // Export jobs + tasks to a CSV (Excel-friendly)
+  const exportExcelReport = () => {
+    try {
+      const escapeCsv = (val) => {
+        const str = val === null || val === undefined ? '' : String(val)
+        const escaped = str.replace(/"/g, '""')
+        return `"${escaped}"`
+      }
+
+      const header = [
+        'job_id', 'job_name', 'job_status', 'job_priority', 'job_order_number', 'client_name', 'client_email', 'client_phone', 'job_total_value', 'task_id', 'task_name', 'task_status', 'task_estimated_hours', 'task_deadline', 'task_created_at', 'task_completed_at', 'task_completed_by', 'task_value', 'task_assigned_to', 'task_description'
+      ]
+
+      const rows = (tasks || []).map(task => {
+        const job = (jobs || []).find(j => j.id === task.job_id) || {}
+        const assigned = Array.isArray(task.assigned_to)
+          ? task.assigned_to.join('; ')
+          : (task.assigned_to || '')
+
+        return [
+          job.id || '',
+          job.name || '',
+          job.status || '',
+          job.priority || '',
+          job.order_number || '',
+          job.client_name || '',
+          job.client_email || '',
+          job.client_phone || '',
+          job.total_value != null ? job.total_value : '',
+          task.id || '',
+          task.name || '',
+          task.status || '',
+          task.estimated_hours != null ? task.estimated_hours : '',
+          task.deadline || '',
+          task.created_at || '',
+          task.completed_at || '',
+          task.completed_by || '',
+          task.value != null ? task.value : '',
+          assigned,
+          task.description || ''
+        ].map(escapeCsv).join(',')
+      })
+
+      const csv = [header.join(','), ...rows].join('\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `raport_ceo_${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('exportExcelReport error', err)
+      setError(err.message || 'Eroare la export CSV')
     }
   }
 
@@ -240,7 +292,8 @@ export default function CEODashboard() {
         client_email: clientemail || null,
         status: 'todo',
         created_by: user?.id || null,
-        total_value: jobValue ? parseFloat(jobValue) : 0
+        total_value: jobValue ? parseFloat(jobValue) : 0,
+        order_number: orderNumber || null
       }]).select()
       if (jobErr) throw jobErr
 
@@ -302,6 +355,7 @@ export default function CEODashboard() {
       setClientemail('')
       setClientPhone('')
       setJobValue('')
+        setOrderNumber('')
       setNewJobTasks([{ name: '', description: '', assigned_to: [], estimated_hours: '', value: '', deadline: '' }])
       setShowCreateWithTasks(false)
       setMessage('✅ Job și taskuri create!')
@@ -333,6 +387,7 @@ export default function CEODashboard() {
       name: job.name,
       priority: job.priority || 'normal',
       client_name: job.client_name,
+        order_number: job.order_number || '',
       client_phone: job.client_phone || '',
       client_id_series: job.client_id_series || '',
       client_cnp: job.client_cnp || '',
@@ -366,6 +421,7 @@ export default function CEODashboard() {
       if (jobEdits.client_id_series !== undefined) updates.client_id_series = jobEdits.client_id_series || null
       if (jobEdits.client_cnp !== undefined) updates.client_cnp = jobEdits.client_cnp || null
       if (jobEdits.client_address !== undefined) updates.client_address = jobEdits.client_address || null
+  if (jobEdits.order_number !== undefined) updates.order_number = jobEdits.order_number || null
 
       const { data, error: updErr } = await supabase.from('jobs').update(updates).eq('id', jobId).select()
       if (updErr) throw updErr
@@ -733,8 +789,21 @@ export default function CEODashboard() {
     setLoading(true)
     setError(null)
     try {
+      // Delete from profiles table
       const { error: delErr } = await supabase.from('profiles').delete().eq('id', profileId)
       if (delErr) throw delErr
+
+      // Delete user from Supabase Auth so email can be reused
+      try {
+        const { error: authErr } = await supabase.auth.admin.deleteUser(profileId)
+        if (authErr) {
+          console.warn('Failed to delete user from Auth (may require service_role key):', authErr)
+          // Don't fail the whole operation if auth delete fails
+        }
+      } catch (authError) {
+        console.warn('Auth delete error:', authError)
+      }
+
       setProfiles(prev => prev.filter(p => p.id !== profileId))
       setMessage('✅ Angajat șters cu succes!')
       setTimeout(() => setMessage(null), 3000)
@@ -990,6 +1059,7 @@ export default function CEODashboard() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={() => setShowCalendar(s => !s)} className="btn btn-primary" style={{ padding: '8px 12px', borderRadius: 6 }}>📅 Calendar</button>
           <button onClick={() => setShowMonthlyReport(s => !s)} className="btn btn-primary" style={{ padding: '8px 12px', borderRadius: 6 }}>📊 Raport lunar</button>
+          <button onClick={exportExcelReport} className="btn btn-primary" style={{ padding: '8px 12px', borderRadius: 6 }}>📥 Export Excel (CSV)</button>
         </div>
 
         {showCalendar && renderCalendar()}
@@ -1077,6 +1147,7 @@ export default function CEODashboard() {
                 <input type="email" placeholder="Client Email" value={clientemail} onChange={e => setClientemail(e.target.value)} />
                 <input placeholder="Client Telefon" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
                 <input type="number" placeholder="Valoare job (lei)" value={jobValue} onChange={e => setJobValue(e.target.value)} step="0.01" min="0" />
+                              <input placeholder="Număr comandă (opțional)" value={orderNumber} onChange={e => setOrderNumber(e.target.value)} />
               </div>
 
               <div style={{ marginTop: 8, borderTop: '1px dashed #ddd', paddingTop: 8 }}>
@@ -1150,6 +1221,7 @@ export default function CEODashboard() {
                     <option value="urgent">Urgent</option>
                   </select>
                   <input type="number" placeholder="Valoare job (lei)" value={jobEdits.total_value || ''} onChange={e => setJobEdits(prev => ({ ...prev, total_value: e.target.value }))} style={{ marginRight: 8, marginTop: 6 }} step="0.01" min="0" />
+                                    <input placeholder="Număr comandă" value={jobEdits.order_number || ''} onChange={e => setJobEdits(prev => ({ ...prev, order_number: e.target.value }))} style={{ marginRight: 8, marginTop: 6 }} />
                   <select value={jobEdits.status || 'todo'} onChange={e => setJobEdits(prev => ({ ...prev, status: e.target.value }))} style={{ marginRight: 8, marginTop: 6 }}>
                     <option value="todo">Todo</option>
                     <option value="completed">Completed</option>
@@ -1172,9 +1244,7 @@ export default function CEODashboard() {
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button onClick={() => setExpandedJob(isExpanded ? null : job.id)} style={{ fontSize: 12 }}>{isExpanded ? '🔼 Ascunde' : '🔽 Detalii'}</button>
                     <button onClick={() => startEditJob(job)} style={{ fontSize: 12 }}>✏️ Editează</button>
-                    {(job.status === 'completed' || areAllTasksCompleted(tasks, job.id)) && (
-                      <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
-                    )}
+                    <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
                     <button onClick={() => deleteJob(job.id)} style={{ fontSize: 12, color: 'red' }}>🗑️ Șterge</button>
                   </div>
                 </div>
@@ -1229,8 +1299,12 @@ export default function CEODashboard() {
                                 <strong>{task.name}</strong> <span style={{ color: '#666' }}>({task.status})</span>
                                 <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
                                   <div>Asignat: {assignedProfiles.length > 0 ? assignedProfiles.map(p => displayUserLabel(p)).join(', ') : '(Neasignat)'}</div>
-                                  {task.estimated_hours && (<div>⏱️ {formatDuration(task.estimated_hours)} → {formatEstimatedDate(task.estimated_hours)}</div>)}
+                                  {task.estimated_hours && (<div>⏱️ {formatDuration(task.estimated_hours)}</div>)}
+                                  {task.deadline && (<div>📅 Deadline: {new Date(task.deadline).toLocaleDateString('ro-RO')}</div>)}
                                   {(task.value || task.value === 0) && (<div>💰 {task.value} lei</div>)}
+                                </div>
+                                <div style={{ fontSize: 12, color: '#444', marginTop: 4 }}>
+                                  Descriere: {task.description || 'Nespecificat'}
                                 </div>
                               </div>
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
