@@ -44,6 +44,10 @@ const AdminDashboard = () => {
   const [editingProfileId, setEditingProfileId] = useState(null)
   const [profileEdits, setProfileEdits] = useState({})
 
+  // Stare creare profil nou
+  const [showCreateProfile, setShowCreateProfile] = useState(false)
+  const [newProfileData, setNewProfileData] = useState({ email: '', password: '', confirmPassword: '', full_name: '', role: 'employee' })
+
   // Stare calendar
   const [showCalendar, setShowCalendar] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -656,20 +660,95 @@ const AdminDashboard = () => {
       return
     }
 
-    if (!window.confirm('Sigur vrei să ștergi acest angajat? Această acțiune este ireversibilă!')) return
+    if (!window.confirm('Sigur vrei să ștergi acest angajat? Se va șterge și din auth.users!\n\nAceastă acțiune este ireversibilă!')) return
 
     setLoading(true)
     setError(null)
     try {
+      // First, delete from auth.users using API endpoint
+      const deleteAuthResponse = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: profileId })
+      })
+
+      if (!deleteAuthResponse.ok) {
+        const errData = await deleteAuthResponse.json()
+        throw new Error(errData.error || 'Failed to delete from auth.users')
+      }
+
+      // Then delete from profiles table
       const { error: delErr } = await supabase.from('profiles').delete().eq('id', profileId)
       if (delErr) throw delErr
 
       setProfiles(prev => prev.filter(p => p.id !== profileId))
-      setMessage('✅ Angajat șters cu succes!')
+      setMessage('✅ Angajat șters cu succes din auth.users și profiles!')
       setTimeout(() => setMessage(null), 3000)
     } catch (err) {
       console.error(err)
       setError(err.message || 'Eroare la ștergere angajat')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Funcții creare profil nou
+  const handleCreateNewProfile = async (e) => {
+    e.preventDefault()
+    setError(null)
+    setMessage(null)
+
+    // Validări
+    if (!newProfileData.email || !newProfileData.password || !newProfileData.full_name) {
+      setError('❌ Email, parolă și nume sunt obligatorii!')
+      return
+    }
+
+    if (newProfileData.password !== newProfileData.confirmPassword) {
+      setError('❌ Parolele nu se potrivesc!')
+      return
+    }
+
+    if (newProfileData.password.length < 6) {
+      setError('❌ Parola trebuie să aibă cel puțin 6 caractere!')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      // 1. Create user in auth.users via Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newProfileData.email,
+        password: newProfileData.password
+      })
+
+      if (authError) throw authError
+
+      const newUserId = authData.user?.id
+
+      // 2. Create profile in profiles table
+      const { error: profileError } = await supabase.from('profiles').insert([{
+        id: newUserId,
+        email: newProfileData.email,
+        full_name: newProfileData.full_name,
+        role: newProfileData.role,
+        created_at: new Date().toISOString()
+      }])
+
+      if (profileError) throw profileError
+
+      // Success
+      setMessage('✅ Profil nou creat cu succes!')
+      setNewProfileData({ email: '', password: '', confirmPassword: '', full_name: '', role: 'employee' })
+      setShowCreateProfile(false)
+      
+      // Refresh profiles list
+      await fetchProfiles()
+      setTimeout(() => setMessage(null), 3000)
+    } catch (err) {
+      console.error(err)
+      setError(err.message || 'Eroare la crearea profilului')
     } finally {
       setLoading(false)
     }
@@ -1039,6 +1118,113 @@ const AdminDashboard = () => {
                   ))}
                 </div>
               )}
+
+              {/* Secțiune creare profil nou */}
+              <div style={{
+                marginTop: 20,
+                padding: 12,
+                border: '2px dashed #2196F3',
+                borderRadius: 8,
+                backgroundColor: '#f0f8ff'
+              }}>
+                <button 
+                  onClick={() => setShowCreateProfile(s => !s)}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 'bold',
+                    backgroundColor: '#2196F3',
+                    color: 'white',
+                    padding: '8px 16px',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    marginBottom: showCreateProfile ? 12 : 0
+                  }}
+                >
+                  ➕ {showCreateProfile ? 'Ascunde Formular' : 'Creează Profil Nou'}
+                </button>
+
+                {showCreateProfile && (
+                  <form onSubmit={handleCreateNewProfile} style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10
+                  }}>
+                    <input
+                      type="email"
+                      placeholder="Email"
+                      value={newProfileData.email}
+                      onChange={e => setNewProfileData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                      style={{ padding: '8px', borderRadius: 4, border: '1px solid #ccc' }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Nume Complet"
+                      value={newProfileData.full_name}
+                      onChange={e => setNewProfileData(prev => ({ ...prev, full_name: e.target.value }))}
+                      required
+                      style={{ padding: '8px', borderRadius: 4, border: '1px solid #ccc' }}
+                    />
+                    <input
+                      type="password"
+                      placeholder="Parolă (min 6 caractere)"
+                      value={newProfileData.password}
+                      onChange={e => setNewProfileData(prev => ({ ...prev, password: e.target.value }))}
+                      required
+                      style={{ padding: '8px', borderRadius: 4, border: '1px solid #ccc' }}
+                    />
+                    <input
+                      type="password"
+                      placeholder="Confirmă Parola"
+                      value={newProfileData.confirmPassword}
+                      onChange={e => setNewProfileData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      required
+                      style={{ padding: '8px', borderRadius: 4, border: '1px solid #ccc' }}
+                    />
+                    <select
+                      value={newProfileData.role}
+                      onChange={e => setNewProfileData(prev => ({ ...prev, role: e.target.value }))}
+                      style={{ padding: '8px', borderRadius: 4, border: '1px solid #ccc' }}
+                    >
+                      <option value="employee">Employee</option>
+                      <option value="ceo">CEO</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button 
+                        type="submit" 
+                        disabled={loading}
+                        style={{
+                          backgroundColor: '#4CAF50',
+                          color: 'white',
+                          padding: '8px 16px',
+                          border: 'none',
+                          borderRadius: 4,
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          opacity: loading ? 0.6 : 1
+                        }}
+                      >
+                        ✅ Creează Profil
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setShowCreateProfile(false)}
+                        style={{
+                          backgroundColor: '#999',
+                          color: 'white',
+                          padding: '8px 16px',
+                          border: 'none',
+                          borderRadius: 4,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ❌ Anulează
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
           )}
 
