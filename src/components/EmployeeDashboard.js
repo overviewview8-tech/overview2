@@ -547,8 +547,16 @@ const EmployeeDashboard = () => {
 
   const downloadPdfForJob = async (job) => {
     try {
-      // Use manually set order_number from job record (no auto-generation)
-      const orderNum = job.order_number || null
+      let assignedOrder = null
+      try {
+        const rpcRes = await supabase.rpc('assign_job_order', { p_job_id: job.id })
+        if (rpcRes && rpcRes.data != null) {
+          if (Array.isArray(rpcRes.data)) assignedOrder = rpcRes.data[0]
+          else assignedOrder = rpcRes.data
+        }
+      } catch (rpcErr) {
+        console.warn('assign_job_order RPC failed', rpcErr)
+      }
 
       const jobTasks = tasks.filter(t => t.job_id === job.id).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       const totalValue = (jobTasks || []).reduce((s, t) => s + (parseFloat(t.value) || 0), 0)
@@ -564,7 +572,7 @@ const EmployeeDashboard = () => {
         totalValue,
         completedAt: job.completed_at || new Date().toISOString(),
         receptionNumber: job.reception_number || job.receptionNumber || null,
-        orderNumber: orderNum
+        orderNumber: assignedOrder != null ? assignedOrder : (job.order_number || null)
       }
       const { generateAndDownloadPdf } = await import('../utils/generatePdfClient')
       const res = await generateAndDownloadPdf(pdfData)
@@ -629,7 +637,9 @@ const EmployeeDashboard = () => {
                     <button onClick={() => setExpandedJob(isExpanded ? null : job.id)} style={{ fontSize: 12 }}>
                       {isExpanded ? '🔼 Ascunde' : '🔽 Detalii'}
                     </button>
-                    <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
+                    {(job.status === 'completed' || areAllTasksCompleted(tasks, job.id)) && (
+                      <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
+                    )}
                   </div>
                 </div>
 
@@ -660,13 +670,7 @@ const EmployeeDashboard = () => {
                               <div style={{ fontSize: 11, color: '#666' }}>
                                 Status: <strong>{task.status}</strong> | Asignat: {assignedLabels}
                                 {task.estimated_hours && (
-                                  <span> | ⏱️ {formatDuration(task.estimated_hours)}</span>
-                                )}
-                                {task.deadline && (
-                                  <span> | 📅 Deadline: {new Date(task.deadline).toLocaleDateString('ro-RO')}</span>
-                                )}
-                                {task.value != null && (
-                                  <span> | 💰 Valoare: {parseFloat(task.value).toFixed(2)} lei</span>
+                                  <span> | ⏱️ {formatDuration(task.estimated_hours)} → {formatEstimatedDate(task.estimated_hours)}</span>
                                 )}
                               </div>
                             </div>
@@ -689,9 +693,6 @@ const EmployeeDashboard = () => {
                                   ✅ Completat
                                 </span>
                               )}
-                            </div>
-                            <div style={{ fontSize: 12, color: '#444', marginTop: 4 }}>
-                              <strong>Descriere:</strong> {task.description || 'Nespecificat'}
                             </div>
                           </div>
 
