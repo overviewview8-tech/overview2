@@ -40,6 +40,10 @@ export default function CEODashboard() {
   const [editingProfileId, setEditingProfileId] = useState(null)
   const [profileEdits, setProfileEdits] = useState({})
 
+  // Create new profile state
+  const [showCreateProfile, setShowCreateProfile] = useState(false)
+  const [newProfileData, setNewProfileData] = useState({ email: '', password: '', confirmPassword: '', full_name: '', role: 'employee' })
+
   // Calendar
   const [showCalendar, setShowCalendar] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -729,18 +733,94 @@ export default function CEODashboard() {
       setTimeout(() => setError(null), 3000)
       return
     }
-    if (!window.confirm('Sigur vrei să ștergi acest angajat? Această acțiune este ireversibilă!')) return
+    if (!window.confirm('Sigur vrei să ștergi acest angajat? Se va șterge și din auth.users!\n\nAceastă acțiune este ireversibilă!')) return
     setLoading(true)
     setError(null)
     try {
+      // First, delete from auth.users using API endpoint
+      const deleteAuthResponse = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: profileId })
+      })
+
+      if (!deleteAuthResponse.ok) {
+        const errData = await deleteAuthResponse.json()
+        throw new Error(errData.error || 'Failed to delete from auth.users')
+      }
+
+      // Then delete from profiles table
       const { error: delErr } = await supabase.from('profiles').delete().eq('id', profileId)
       if (delErr) throw delErr
       setProfiles(prev => prev.filter(p => p.id !== profileId))
-      setMessage('✅ Angajat șters cu succes!')
+      setMessage('✅ Angajat șters cu succes din auth.users și profiles!')
       setTimeout(() => setMessage(null), 3000)
     } catch (err) {
       console.error(err)
       setError(err.message || 'Eroare la ștergere angajat')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Create new profile function
+  const handleCreateNewProfile = async (e) => {
+    e.preventDefault()
+    setError(null)
+    setMessage(null)
+
+    // Validări
+    if (!newProfileData.email || !newProfileData.password || !newProfileData.full_name) {
+      setError('❌ Email, parolă și nume sunt obligatorii!')
+      return
+    }
+
+    if (newProfileData.password !== newProfileData.confirmPassword) {
+      setError('❌ Parolele nu se potrivesc!')
+      return
+    }
+
+    if (newProfileData.password.length < 6) {
+      setError('❌ Parola trebuie să aibă cel puțin 6 caractere!')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      // 1. Create user in auth.users via Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newProfileData.email,
+        password: newProfileData.password
+      })
+
+      if (authError) throw authError
+
+      const newUserId = authData.user?.id
+
+      // 2. Create profile in profiles table
+      const { error: profileError } = await supabase.from('profiles').insert([{
+        id: newUserId,
+        email: newProfileData.email,
+        full_name: newProfileData.full_name,
+        role: newProfileData.role,
+        created_at: new Date().toISOString()
+      }])
+
+      if (profileError) throw profileError
+
+      // Success
+      setMessage('✅ Profil nou creat cu succes!')
+      setNewProfileData({ email: '', password: '', confirmPassword: '', full_name: '', role: 'employee' })
+      setShowCreateProfile(false)
+      
+      // Refresh profiles list
+      const { data, error: err } = await supabase.from('profiles').select('id, email, full_name, role, created_at')
+      if (!err) setProfiles(data || [])
+      setTimeout(() => setMessage(null), 3000)
+    } catch (err) {
+      console.error(err)
+      setError(err.message || 'Eroare la crearea profilului')
     } finally {
       setLoading(false)
     }
@@ -1055,6 +1135,70 @@ export default function CEODashboard() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Buton și formular creare profil nou */}
+          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+            <button onClick={() => setShowCreateProfile(s => !s)} style={{ fontSize: 12, backgroundColor: '#4CAF50', color: 'white', padding: '8px 12px', borderRadius: 4, border: 'none', cursor: 'pointer' }}>
+              ➕ {showCreateProfile ? 'Ascunde' : 'Creează Profil Nou'}
+            </button>
+          </div>
+
+          {showCreateProfile && (
+            <div style={{ marginTop: 12, padding: 16, border: '2px solid #FF9800', borderRadius: 8, backgroundColor: '#fff3e0' }}>
+              <h3 style={{ marginTop: 0 }}>➕ Creează Profil Nou</h3>
+              <form onSubmit={handleCreateNewProfile} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={newProfileData.email}
+                  onChange={e => setNewProfileData(prev => ({ ...prev, email: e.target.value }))}
+                  required
+                  style={{ padding: '8px 12px', borderRadius: 4, border: '1px solid #ddd' }}
+                />
+                <input
+                  type="text"
+                  placeholder="Nume Complet"
+                  value={newProfileData.full_name}
+                  onChange={e => setNewProfileData(prev => ({ ...prev, full_name: e.target.value }))}
+                  required
+                  style={{ padding: '8px 12px', borderRadius: 4, border: '1px solid #ddd' }}
+                />
+                <input
+                  type="password"
+                  placeholder="Parolă (min 6 caractere)"
+                  value={newProfileData.password}
+                  onChange={e => setNewProfileData(prev => ({ ...prev, password: e.target.value }))}
+                  required
+                  style={{ padding: '8px 12px', borderRadius: 4, border: '1px solid #ddd' }}
+                />
+                <input
+                  type="password"
+                  placeholder="Confirmă Parolă"
+                  value={newProfileData.confirmPassword}
+                  onChange={e => setNewProfileData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  required
+                  style={{ padding: '8px 12px', borderRadius: 4, border: '1px solid #ddd' }}
+                />
+                <select
+                  value={newProfileData.role}
+                  onChange={e => setNewProfileData(prev => ({ ...prev, role: e.target.value }))}
+                  style={{ padding: '8px 12px', borderRadius: 4, border: '1px solid #ddd' }}
+                >
+                  <option value="employee">Employee</option>
+                  <option value="admin">Admin</option>
+                  <option value="ceo">CEO</option>
+                </select>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="submit" disabled={loading} style={{ flex: 1, padding: '10px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>
+                    ✅ Creează Profil
+                  </button>
+                  <button type="button" onClick={() => setShowCreateProfile(false)} style={{ flex: 1, padding: '10px', backgroundColor: '#999', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                    ❌ Anulează
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 
