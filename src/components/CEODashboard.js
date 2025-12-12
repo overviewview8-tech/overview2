@@ -925,6 +925,75 @@ export default function CEODashboard() {
     return { rows, overallTotal: rows.reduce((s, r) => s + r.totalValue, 0), totalTasks: completedTasks.length }
   }
 
+  const exportMonthlyReportToCSV = () => {
+    const monthNames = ['Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie', 'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie']
+    const report = computeMonthlyReport(reportMonth)
+    const monthName = monthNames[reportMonth.getMonth()]
+    const year = reportMonth.getFullYear()
+
+    // CSV Header with all details
+    let csv = 'Angajat,Email,Rol,Nume Task,Descriere Task,Status Task,Ore Estimate,Valoare Task (lei),Data Creare Task,Data Finalizare Task,Deadline Task,Nume Job,Client,Email Client,Telefon Client,Status Job,Prioritate Job,Valoare Job (lei),Data Creare Job,Data Finalizare Job\n'
+
+    // Data rows
+    report.rows.forEach(row => {
+      const employeeName = row.profile ? (row.profile.full_name || row.profile.email) : '(Neasignat)'
+      const employeeEmail = row.profile ? row.profile.email : 'N/A'
+      const employeeRole = row.profile ? row.profile.role : 'N/A'
+      
+      row.tasks.forEach((task) => {
+        const job = jobs.find(j => j.id === task.job_id)
+        
+        // Task details
+        const taskName = `"${(task.name || '').replace(/"/g, '""')}"`
+        const taskDesc = `"${(task.description || 'N/A').replace(/"/g, '""')}"`
+        const taskStatus = task.status || 'N/A'
+        const taskHours = task.estimated_hours ? parseFloat(task.estimated_hours).toFixed(2) : '0'
+        const taskValue = (parseFloat(task.value) || 0).toFixed(2)
+        const taskCreated = task.created_at ? new Date(task.created_at).toLocaleString('ro-RO') : 'N/A'
+        const taskCompleted = task.completed_at ? new Date(task.completed_at).toLocaleString('ro-RO') : 'N/A'
+        const taskDeadline = task.deadline ? new Date(task.deadline).toLocaleString('ro-RO') : 'N/A'
+        
+        // Job details
+        const jobName = job ? `"${(job.name || '').replace(/"/g, '""')}"` : 'N/A'
+        const jobClient = job ? `"${(job.client_name || 'N/A').replace(/"/g, '""')}"` : 'N/A'
+        const jobClientEmail = job ? (job.client_email || 'N/A') : 'N/A'
+        const jobClientPhone = job ? (job.client_phone || 'N/A') : 'N/A'
+        const jobStatus = job ? job.status : 'N/A'
+        const jobPriority = job ? (job.priority || 'normal') : 'N/A'
+        const jobValue = job ? (parseFloat(job.total_value) || 0).toFixed(2) : '0'
+        const jobCreated = job && job.created_at ? new Date(job.created_at).toLocaleString('ro-RO') : 'N/A'
+        const jobCompleted = job && job.completed_at ? new Date(job.completed_at).toLocaleString('ro-RO') : 'N/A'
+        
+        csv += `"${employeeName}","${employeeEmail}","${employeeRole}",${taskName},${taskDesc},"${taskStatus}",${taskHours},${taskValue},"${taskCreated}","${taskCompleted}","${taskDeadline}",${jobName},${jobClient},"${jobClientEmail}","${jobClientPhone}","${jobStatus}","${jobPriority}",${jobValue},"${jobCreated}","${jobCompleted}"\n`
+      })
+    })
+
+    // Add summary section
+    csv += `\n"REZUMAT"\n`
+    csv += `"Luna:","${monthName} ${year}"\n`
+    csv += `"Total Taskuri Finalizate:","${report.totalTasks}"\n`
+    csv += `"Valoare Totala (lei):","${report.overallTotal.toFixed(2)}"\n`
+    csv += `\n"DETALII PE ANGAJAT"\n`
+    csv += `"Angajat","Email","Numar Taskuri","Valoare Totala (lei)"\n`
+    
+    report.rows.forEach(row => {
+      const employeeName = row.profile ? (row.profile.full_name || row.profile.email) : '(Neasignat)'
+      const employeeEmail = row.profile ? row.profile.email : 'N/A'
+      csv += `"${employeeName}","${employeeEmail}","${row.count}","${row.totalValue.toFixed(2)}"\n`
+    })
+
+    // Create and download file
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `Raport_Lunar_Detaliat_${monthName}_${year}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   const renderMonthlyReport = () => {
     const monthNames = ['Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie', 'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie']
     const report = computeMonthlyReport(reportMonth)
@@ -941,6 +1010,7 @@ export default function CEODashboard() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <div style={{ fontSize: 14 }}>Total taskuri finalizate: <strong>{report.totalTasks}</strong></div>
               <div style={{ fontSize: 14 }}>Valoare totală (lei): <strong>{report.overallTotal.toFixed(2)}</strong></div>
+              <button onClick={exportMonthlyReportToCSV} style={{ background: '#4CAF50', color: 'white', border: 'none', padding: '8px 12px', borderRadius: 6 }}> 📥 Export CSV </button>
               <button onClick={() => { setShowMonthlyReport(false); setReportMonth(new Date()) }} style={{ background: '#f44336', color: 'white', border: 'none', padding: '8px 12px', borderRadius: 6 }}> Închide </button>
             </div>
           </div>

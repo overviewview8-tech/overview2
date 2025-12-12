@@ -1,3 +1,4 @@
+
 # Ghid: Ștergere Utilizatori și Creare Profiluri Noi
 
 ## 🔐 Funcționalități noi
