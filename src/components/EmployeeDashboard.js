@@ -630,7 +630,10 @@ const EmployeeDashboard = () => {
                         <div style={{ fontSize: 12, color: '#333' }}>💰 Valoare job: {job.total_value != null ? parseFloat(job.total_value).toFixed(2) + ' lei' : 'N/A'}</div>
                     <div style={{ fontSize: 11, color: '#666' }}>
                       ⏱️ Timp estimat: <strong>{formatDuration(totalHours)}</strong>
-                      {totalHours > 0 && ` → Estimare finalizare: ${formatEstimatedDate(totalHours)}`}
+                      {(() => {
+                        const earliestDeadline = jobTasks.filter(t => t.deadline).sort((a, b) => new Date(a.deadline) - new Date(b.deadline))[0];
+                        return earliestDeadline ? ` → Termen limită: ${new Date(earliestDeadline.deadline).toLocaleDateString('ro-RO', { year: 'numeric', month: 'long', day: 'numeric' })}` : '';
+                      })()}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
@@ -670,7 +673,7 @@ const EmployeeDashboard = () => {
                               <div style={{ fontSize: 11, color: '#666' }}>
                                 Status: <strong>{task.status}</strong> | Asignat: {assignedLabels}
                                 {task.estimated_hours && (
-                                  <span> | ⏱️ {formatDuration(task.estimated_hours)} → {formatEstimatedDate(task.estimated_hours)}</span>
+                                  <span> | ⏱️ {formatDuration(task.estimated_hours)}{task.deadline ? ` → Termen: ${new Date(task.deadline).toLocaleDateString('ro-RO', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}</span>
                                 )}
                               </div>
                             </div>

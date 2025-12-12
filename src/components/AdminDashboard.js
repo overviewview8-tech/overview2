@@ -1372,7 +1372,10 @@ const AdminDashboard = () => {
                     
                     <div style={{ fontSize: 11, color: '#666' }}>
                       ⏱️ Timp estimat: <strong>{formatDuration(totalHours)}</strong>
-                      {totalHours > 0 && ` → Estimare finalizare: ${formatEstimatedDate(totalHours)}`}
+                      {(() => {
+                        const earliestDeadline = jobTasks.filter(t => t.deadline).sort((a, b) => new Date(a.deadline) - new Date(b.deadline))[0];
+                        return earliestDeadline ? ` → Termen limită: ${new Date(earliestDeadline.deadline).toLocaleDateString('ro-RO', { year: 'numeric', month: 'long', day: 'numeric' })}` : '';
+                      })()}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
@@ -1458,7 +1461,7 @@ const AdminDashboard = () => {
                                 <div style={{ fontSize: 11, color: '#666' }}>
                                   Asignat: {assignedProfiles.length > 0 ? assignedProfiles.map(p => displayUserLabel(p)).join(', ') : '(Neasignat)'}
                                   {task.estimated_hours && (
-                                    <span> | ⏱️ {formatDuration(task.estimated_hours)} → {formatEstimatedDate(task.estimated_hours)}</span>
+                                    <span> | ⏱️ {formatDuration(task.estimated_hours)}{task.deadline ? ` → Termen: ${new Date(task.deadline).toLocaleDateString('ro-RO', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}</span>
                                   )}
                                   {task.value != null && (
                                     <span> | 💰 Valoare: {parseFloat(task.value).toFixed(2)}</span>

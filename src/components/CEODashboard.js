@@ -1381,7 +1381,10 @@ export default function CEODashboard() {
                       </div>
                     
                       <div style={{ fontSize: 12, color: '#333' }}>💰 Valoare job: {job.total_value != null ? parseFloat(job.total_value).toFixed(2) + ' lei' : 'N/A'}</div>
-                    <div style={{ fontSize: 11, color: '#666' }}>⏱️ Timp estimat: <strong>{formatDuration(totalHours)}</strong>{totalHours > 0 && ` → Estimare finalizare: ${formatEstimatedDate(totalHours)}`}</div>
+                    <div style={{ fontSize: 11, color: '#666' }}>⏱️ Timp estimat: <strong>{formatDuration(totalHours)}</strong>{(() => {
+                      const earliestDeadline = jobTasks.filter(t => t.deadline).sort((a, b) => new Date(a.deadline) - new Date(b.deadline))[0];
+                      return earliestDeadline ? ` → Termen limită: ${new Date(earliestDeadline.deadline).toLocaleDateString('ro-RO', { year: 'numeric', month: 'long', day: 'numeric' })}` : '';
+                    })()}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button onClick={() => setExpandedJob(isExpanded ? null : job.id)} style={{ fontSize: 12 }}>{isExpanded ? '🔼 Ascunde' : '🔽 Detalii'}</button>
@@ -1443,7 +1446,7 @@ export default function CEODashboard() {
                                 <strong>{task.name}</strong> <span style={{ color: '#666' }}>({task.status})</span>
                                 <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
                                   <div>Asignat: {assignedProfiles.length > 0 ? assignedProfiles.map(p => displayUserLabel(p)).join(', ') : '(Neasignat)'}</div>
-                                  {task.estimated_hours && (<div>⏱️ {formatDuration(task.estimated_hours)} → {formatEstimatedDate(task.estimated_hours)}</div>)}
+                                  {task.estimated_hours && (<div>⏱️ {formatDuration(task.estimated_hours)}{task.deadline ? ` → Termen: ${new Date(task.deadline).toLocaleDateString('ro-RO', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}</div>)}
                                   {(task.value || task.value === 0) && (<div>💰 {task.value} lei</div>)}
                                 </div>
                               </div>
