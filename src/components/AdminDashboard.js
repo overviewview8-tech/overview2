@@ -20,6 +20,7 @@ const AdminDashboard = () => {
   const [clientPhone, setClientPhone] = useState('')
   const [jobPriority, setJobPriority] = useState('normal')
   const [jobValue, setJobValue] = useState('')
+  const [jobOrderNumber, setJobOrderNumber] = useState('')
   const [clientIdSeries, setClientIdSeries] = useState('')
   const [clientCNP, setClientCNP] = useState('')
   const [clientAddress, setClientAddress] = useState('')
@@ -29,6 +30,7 @@ const AdminDashboard = () => {
   const [expandedJob, setExpandedJob] = useState(null)
   const [editingJobId, setEditingJobId] = useState(null)
   const [jobEdits, setJobEdits] = useState({})
+  const [amountPaidDraft, setAmountPaidDraft] = useState({})
 
   // Stare pentru task expandat și editare
   const [expandedTask, setExpandedTask] = useState(null)
@@ -198,7 +200,8 @@ const AdminDashboard = () => {
         client_email: clientemail || null,
         status: 'todo',
         created_by: user.id,
-        total_value: jobValue ? parseFloat(jobValue) : 0
+        total_value: jobValue ? parseFloat(jobValue) : 0,
+        order_number: jobOrderNumber ? parseInt(jobOrderNumber, 10) : null
       }]).select()
       if (jobErr) throw jobErr
 
@@ -257,6 +260,7 @@ const AdminDashboard = () => {
       setClientemail('')
       setClientPhone('')
       setNewJobTasks([{ name: '', description: '', assigned_to: [], estimated_hours: '' }])
+      setJobOrderNumber('')
       setShowCreateWithTasks(false)
       setMessage('✅ Job și taskuri create!')
       setTimeout(() => setMessage(null), 3000)
@@ -298,7 +302,9 @@ const AdminDashboard = () => {
       client_address: job.client_address || '',
       client_email: job.client_email || '',
       status: job.status,
-      total_value: job.total_value != null ? job.total_value : ''
+      total_value: job.total_value != null ? job.total_value : '',
+      amount_paid: job.amount_paid != null ? job.amount_paid : '',
+      order_number: job.order_number != null ? job.order_number : ''
     })
   }
 
@@ -324,6 +330,8 @@ const AdminDashboard = () => {
       // recalculate total_value based on task.value and may overwrite this
       // manual value if tasks are edited afterwards.
       if (jobEdits.total_value !== undefined) updates.total_value = jobEdits.total_value !== '' ? parseFloat(jobEdits.total_value) : null
+      if (jobEdits.amount_paid !== undefined) updates.amount_paid = jobEdits.amount_paid !== '' ? parseFloat(jobEdits.amount_paid) : 0
+      if (jobEdits.order_number !== undefined) updates.order_number = jobEdits.order_number !== '' ? parseInt(jobEdits.order_number, 10) : null
         // client_first_name and client_last_name are no longer updated
       if (jobEdits.priority !== undefined) updates.priority = jobEdits.priority || 'normal'
       if (jobEdits.client_id_series !== undefined) updates.client_id_series = jobEdits.client_id_series || null
@@ -361,6 +369,30 @@ const AdminDashboard = () => {
     } catch (err) {
       console.error(err)
       setError(err.message || 'Eroare la ștergere job')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAmountPaidChange = (jobId, value) => {
+    setAmountPaidDraft(prev => ({ ...prev, [jobId]: value }))
+  }
+
+  const saveAmountPaid = async (jobId) => {
+    const raw = amountPaidDraft[jobId]
+    const parsed = raw === '' || raw == null ? 0 : parseFloat(raw)
+    setLoading(true)
+    setError(null)
+    try {
+      const { data, error: updErr } = await supabase.from('jobs').update({ amount_paid: isNaN(parsed) ? 0 : parsed }).eq('id', jobId).select()
+      if (updErr) throw updErr
+      const updated = data && data[0] ? data[0] : null
+      if (updated) setJobs(prev => prev.map(j => j.id === jobId ? updated : j))
+      setMessage('✅ Bani încasați actualizați')
+      setTimeout(() => setMessage(null), 2500)
+    } catch (err) {
+      console.error(err)
+      setError(err.message || 'Eroare la actualizare încasări')
     } finally {
       setLoading(false)
     }
@@ -830,7 +862,7 @@ const AdminDashboard = () => {
         totalValue,
         completedAt: job.completed_at || new Date().toISOString(),
         receptionNumber: job.reception_number || job.receptionNumber || null,
-        orderNumber: assignedOrder != null ? assignedOrder : (job.order_number || null)
+        orderNumber: job.order_number != null ? job.order_number : (assignedOrder != null ? assignedOrder : null)
       }
       // generate client-side and download
       const { generateAndDownloadPdf } = await import('../utils/generatePdfClient')
@@ -1253,6 +1285,10 @@ const AdminDashboard = () => {
                   <label style={{ fontSize: 12 }}>Valoare Job (opțional):</label>
                   <input type="number" step="0.01" placeholder="Valoare totală" value={jobValue} onChange={e => setJobValue(e.target.value)} style={{ width: 160, padding: 6 }} />
                 </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
+                  <label style={{ fontSize: 12 }}>Număr de ordine (opțional):</label>
+                  <input type="number" min="1" placeholder="Nr ordine" value={jobOrderNumber} onChange={e => setJobOrderNumber(e.target.value)} style={{ width: 140, padding: 6 }} />
+                </div>
               </div>
 
               <div style={{ marginTop: 8, borderTop: '1px dashed #ddd', paddingTop: 8 }}>
@@ -1358,6 +1394,28 @@ const AdminDashboard = () => {
                       style={{ width: 120, padding: 6 }}
                     />
                   </div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
+                    <label style={{ fontSize: 12 }}>Bani încasați:</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Suma încasată"
+                      value={jobEdits.amount_paid != null ? jobEdits.amount_paid : ''}
+                      onChange={e => setJobEdits(prev => ({ ...prev, amount_paid: e.target.value }))}
+                      style={{ width: 120, padding: 6 }}
+                    />
+                  </div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
+                    <label style={{ fontSize: 12 }}>Nr. ordine:</label>
+                    <input
+                      type="number"
+                      placeholder="Număr ordine"
+                      value={jobEdits.order_number != null ? jobEdits.order_number : ''}
+                      onChange={e => setJobEdits(prev => ({ ...prev, order_number: e.target.value }))}
+                      style={{ width: 100, padding: 6 }}
+                      min="1"
+                    />
+                  </div>
                   <select value={jobEdits.status || 'todo'} onChange={e => setJobEdits(prev => ({ ...prev, status: e.target.value }))} style={{ marginRight: 8 }}>
                     <option value="todo">Todo</option>
                     <option value="completed">Completed</option>
@@ -1368,8 +1426,12 @@ const AdminDashboard = () => {
               ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <div>
-                    <strong style={{ marginRight: 8 }}>{idx + 1}. {job.name}</strong> - {job.client_name} ({job.status})
-                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <strong>{idx + 1}. {job.name}</strong>
+                      {job.order_number && <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 12, color: 'white', backgroundColor: '#2196F3' }}>Nr. {job.order_number}</span>}
+                      <span> - {job.client_name} ({job.status})</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#4CAF50', fontWeight: 'bold' }}>💵 Bani încasați: {job.amount_paid != null ? parseFloat(job.amount_paid).toFixed(2) + ' lei' : '0.00 lei'}</div>
                     <div style={{ fontSize: 11, color: '#666' }}>
                       ⏱️ Timp estimat: <strong>{formatDuration(totalHours)}</strong>
                       {(() => {
@@ -1378,15 +1440,27 @@ const AdminDashboard = () => {
                       })()}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button onClick={() => setExpandedJob(isExpanded ? null : job.id)} style={{ fontSize: 12 }}>
-                      {isExpanded ? '🔼 Ascunde' : '🔽 Detalii'}
-                    </button>
-                    <button onClick={() => startEditJob(job)} style={{ fontSize: 12 }}>✏️ Editează</button>
-                    {(job.status === 'completed' || areAllTasksCompleted(tasks, job.id)) && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <label style={{ fontSize: 11, color: '#333' }}>💵 Încasat:</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={amountPaidDraft[job.id] !== undefined ? amountPaidDraft[job.id] : (job.amount_paid != null ? job.amount_paid : '')}
+                        onChange={e => handleAmountPaidChange(job.id, e.target.value)}
+                        style={{ width: 110, padding: 6 }}
+                      />
+                      <button onClick={() => saveAmountPaid(job.id)} style={{ fontSize: 12 }}>💾</button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => setExpandedJob(isExpanded ? null : job.id)} style={{ fontSize: 12 }}>
+                        {isExpanded ? '🔼 Ascunde' : '🔽 Detalii'}
+                      </button>
+                      <button onClick={() => startEditJob(job)} style={{ fontSize: 12 }}>✏️ Editează</button>
                       <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
-                    )}
-                    <button onClick={() => deleteJob(job.id)} style={{ fontSize: 12, color: 'red' }}>🗑️ Șterge</button>
+                      <button onClick={() => deleteJob(job.id)} style={{ fontSize: 12, color: 'red' }}>🗑️ Șterge</button>
+                    </div>
                   </div>
                 </div>
               )}

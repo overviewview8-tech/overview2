@@ -625,9 +625,14 @@ const EmployeeDashboard = () => {
               <div key={job.id} style={{ marginBottom: 16, padding: 12, border: '1px solid #ccc', borderRadius: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div>
-                        <strong>📁 {idx + 1}. {job.name}</strong> - {job.client_name} ({job.status})
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <strong>📁 {idx + 1}. {job.name}</strong>
+                          {job.order_number && <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 12, color: 'white', backgroundColor: '#2196F3' }}>Nr. {job.order_number}</span>}
+                          <span> - {job.client_name} ({job.status})</span>
+                        </div>
                         
                         <div style={{ fontSize: 12, color: '#333' }}>💰 Valoare job: {job.total_value != null ? parseFloat(job.total_value).toFixed(2) + ' lei' : 'N/A'}</div>
+                        <div style={{ fontSize: 12, color: '#4CAF50', fontWeight: 'bold' }}>💵 Bani încasați: {job.amount_paid != null ? parseFloat(job.amount_paid).toFixed(2) + ' lei' : '0.00 lei'}</div>
                     <div style={{ fontSize: 11, color: '#666' }}>
                       ⏱️ Timp estimat: <strong>{formatDuration(totalHours)}</strong>
                       {(() => {
@@ -640,9 +645,7 @@ const EmployeeDashboard = () => {
                     <button onClick={() => setExpandedJob(isExpanded ? null : job.id)} style={{ fontSize: 12 }}>
                       {isExpanded ? '🔼 Ascunde' : '🔽 Detalii'}
                     </button>
-                    {(job.status === 'completed' || areAllTasksCompleted(tasks, job.id)) && (
-                      <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
-                    )}
+                    <button onClick={() => downloadPdfForJob(job)} style={{ fontSize: 12 }}>📄 Descarcă PDF</button>
                   </div>
                 </div>
 
